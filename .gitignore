@@ -908,3 +908,4 @@ __pycache__/convert_tab_to_yaml.cpython-312.pyc
 .venv/Lib/site-packages/pip-25.0.1.dist-info/AUTHORS.txt
 .venv/Lib/site-packages/_yaml/__pycache__/__init__.cpython-312.pyc
 .venv/Lib/site-packages/_yaml/__init__.py
+*.asv

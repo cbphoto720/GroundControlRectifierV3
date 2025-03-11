@@ -333,3 +333,9 @@ TestreadYAML = yaml.loadFile("SIO_CamDatabaseYAML.yaml");
 Path_to_SIO_CamDatabase="SIO_CamDatabaseYAML.yaml";
 
 appendSIO_CamDatabase("Carson's Camera", 1234, 20250221, cameraparams, Path_to_SIO_CamDatabase)
+
+%% Convert column vector of data into cell array (to hold multiple values)
+camDB.Northings=arrayfun(@(dIn) {dIn},camDB.Northings); %convert column to same values but cells
+camDB.Northings{5}=[1111,2222,3333,44,55] %put in a vector into one of the positions.
+%% CPG_CamDatabase path
+Path_to_SIO_CamDatabase='C:\Users\Carson\Documents\Git\CPG_CameraDatabase\CPG_CamDatabase.yaml'

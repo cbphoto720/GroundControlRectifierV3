@@ -18,11 +18,12 @@ switch selection
         error('User selected cancel.  Please save you variables before getting started.')
 end
 % mfilename('fullpath') 
-%%
+%% For GUI work
 addpath(genpath("C:\Users\Carson\Documents\Git\SIOCameraRectification"));
 addpath("C:\Users\Carson\Documents\Git\cmcrameri\cmcrameri\cmaps") %Scientific color maps
 
-% camSNdatabase=[21217396,22296748,22296760];
+%% For Database work
+addpath(genpath("C:\Users\Carson\Documents\Git\CPG_CameraDatabase"));
 
 %% Options
 maxPointsInSet=5; % The max number of ground control targets in a single frame (usually 5)
@@ -301,13 +302,13 @@ fprintf('Thinking ... ')
 GPSpointTable=importGPSpoints('20250122_Seacliff_set-corrected.txt');
 fprintf('Done Importing!\n')
 %% Find the Average of some GPS points
-rows=[7,8,9];
-j=3;
+rows=4:6;
+j=5;
 a=0; %preallocate avg
 for i=1:length(rows)
     a=a+GPSpointTable(rows(i),j);
 end
-a=a./3;
+a=a./length(rows);
 
 % Work out precision
 get_precision = @(x) find(mod(x, 10.^-(1:15)) == 0, 1, 'first');
@@ -321,7 +322,7 @@ headers = GPSpointTable.Properties.VariableNames;
 VariableName = headers{j};
 
 
-fprintf(['%s AVG: \t %f \n%s Rounded: %.',num2str(max_precision),'f\n'],VariableName,a{1,1}, VariableName,round_a{1,1})
+fprintf(['%s AVG:     %f \n%s Rounded: %.',num2str(max_precision),'f\n'],VariableName,a{1,1}, VariableName,round_a{1,1})
 
 
 %% Matlab YAML
@@ -339,3 +340,36 @@ camDB.Northings=arrayfun(@(dIn) {dIn},camDB.Northings); %convert column to same 
 camDB.Northings{5}=[1111,2222,3333,44,55] %put in a vector into one of the positions.
 %% CPG_CamDatabase path
 Path_to_SIO_CamDatabase='C:\Users\Carson\Documents\Git\CPG_CameraDatabase\CPG_CamDatabase.yaml'
+
+%% appendSIO_CamDatabase tests
+
+appendSIO_CamDatabase(12345, 20240311, Path_to_SIO_CamDatabase, CamNickname="test", CameraParams=camB_cameraParams)
+
+
+
+% import GPS table
+GPSimport=importGPSpoints(options.GCPSurveyFile);
+
+% === Enforce Rule: If GCPSurveyFile is set, LCSorigin must also be set ===
+if ~strcmp(options.GCPSurveyFile, defaults.GCPSurveyFile) % User modified GCPSurveyFile
+    if all(isnan(options.LCSorigin)) || isequal(options.useCameraLCS, defaults.useCameraLCS)
+        error("If 'GCPSurveyFile' is provided, 'LCSorigin' must also be specified.");
+    end
+end
+
+% Calculate world coordinates of GPS survey
+GRS80 = referenceEllipsoid('GRS80'); % Define ellipsoid
+% Convert lat, lon to local coordinate system.  (use UTM elevation as Z coordinate
+[local.xEast,local.yNorth,local.zUp] = geodetic2enu(GPSpoints.Latitude,GPSpoints.Longitude,GPSpoints.Elevation,options.LCSorigin_UTM(1),options.LCSorigin_UTM(2),options.LCSorigin_UTM(3),GRS80);
+
+%%
+GPSimport=importGPSpoints('20250122_Seacliff_set-corrected_CameraB.txt')
+
+LatLonElevation=[GPSimport.Latitude,GPSimport.Longitude,GPSimport.Elevation];
+
+%% Estimate Camera Pose
+CamLatLonElevation=[36.9699952937,-121.9075239478, 31.334]; % Seacliff Cam_B
+GCPtable=importGPSpoints('20250122_Seacliff_set-corrected_CameraC.txt');
+
+EstimateCameraPose(CamLatLonElevation,GCPtable)
+

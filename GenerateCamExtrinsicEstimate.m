@@ -21,10 +21,10 @@ Outputs:
 
 
 %% Do the math
-wgs84 = wgs84Ellipsoid; % Define ellipsoid
+GRS80 = referenceEllipsoid('GRS80'); % Define ellipsoid
 
 % Convert lat, lon to local coordinate system
-[xEast,yNorth,zUp] = geodetic2enu(GPSCamCoords(1),GPSCamCoords(2),GPSCamCoords(3),Center_Controlpoint_est(1),Center_Controlpoint_est(2),Center_Controlpoint_est(3),wgs84);
+[xEast,yNorth,zUp] = geodetic2enu(GPSCamCoords(1),GPSCamCoords(2),GPSCamCoords(3),Center_Controlpoint_est(1),Center_Controlpoint_est(2),Center_Controlpoint_est(3),GRS80);
 
 % Calculate the vector components
 dx = -xEast; % Change in x (relative to origin)

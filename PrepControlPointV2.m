@@ -108,23 +108,24 @@ end
 clear cancelled DefaultOpsFile
 
 %% Pick Camera from database
-[searchKeyoption,rowIDX]=PickCamFromDatabase(UserPrefs.CameraDB);
+% DBinfotable=readCPG_CamDatabase(UserPrefs.CameraDB);
 
-camStruct=importCameraData(UserPrefs.CameraDB, searchKeyoption); %WIP use rowIDX to verify and date confusion about the selected camera!
+% camStruct=importCameraData(UserPrefs.CameraDB, searchKeyoption); %WIP use rowIDX to verify and date confusion about the selected camera!
 
 %% Select GPS file
 GPSpoints=importGPSpoints(UserPrefs.GPSSurveyFile);
 
-% Plot the GPS on a map
-load("hawaiiS.txt"); %load color map
-NUM_IMGsets=size(unique(GPSpoints(:,2)),1);
+% Plot the GPS points as scattered Sets
+load("hawaiiS.txt"); %load color map (max 100 sets = 100*points/set GPS points)
+setnames=unique(GPSpoints(:,2)); % Find unique sets
 
 plt=geoscatter(GPSpoints.Latitude(1),GPSpoints.Longitude(1),36,hawaiiS(1), "filled"); %plot the first point
 geobasemap satellite
 hold on
-for i=1:NUM_IMGsets+1
-    setname="set"+i;
-    mask=strcmp(GPSpoints{:,2},setname);
+NUM_IMGsets=size(setnames,1); % Calc size of loop for all sets
+for i=1:NUM_IMGsets
+    s=setnames.Code(i);
+    mask=strcmp(GPSpoints{:,2},s); % Search points for number of sets
     plt=geoscatter(GPSpoints.Latitude(mask,:),GPSpoints.Longitude(mask,:),36,hawaiiS(i,:),"filled");
 end    
 clear i
@@ -157,6 +158,12 @@ clear vec dir scale offsetx offsety a b c % clean up
 figurename=strcat(surveyName,"_PLOT.png");
 saveas(plt,fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,figurename));
 clear surveyName figurename
+
+%% %WIP Select a ROI for the GPS points!
+% - think about how the image box could also be pulled up to assist.
+
+
+
 
 %% Create usable img copies
 % have user select the number of target in each img to determine how many

@@ -331,15 +331,15 @@ TestreadYAML = yaml.loadFile("SIO_CamDatabaseYAML.yaml");
 
 %% Test write YAML
 
-Path_to_SIO_CamDatabase="SIO_CamDatabaseYAML.yaml";
+Path_to_CPG_CamDatabase="CPG_CamDatabase.yaml";
 
-appendSIO_CamDatabase("Carson's Camera", 1234, 20250221, cameraparams, Path_to_SIO_CamDatabase)
+appendSIO_CamDatabase("Carson's Camera", 1234, 20250221, cameraparams, Path_to_CPG_CamDatabase)
 
 %% Convert column vector of data into cell array (to hold multiple values)
 camDB.Northings=arrayfun(@(dIn) {dIn},camDB.Northings); %convert column to same values but cells
 camDB.Northings{5}=[1111,2222,3333,44,55] %put in a vector into one of the positions.
 %% CPG_CamDatabase path
-Path_to_SIO_CamDatabase='C:\Users\Carson\Documents\Git\CPG_CameraDatabase\CPG_CamDatabase.yaml'
+Path_to_CPG_CamDatabase='C:\Users\Carson\Documents\Git\CPG_CameraDatabase\CPG_CamDatabase.yaml'
 
 %% appendSIO_CamDatabase tests
 
@@ -373,3 +373,48 @@ GCPtable=importGPSpoints('20250122_Seacliff_set-corrected_CameraC.txt');
 
 EstimateCameraPose(CamLatLonElevation,GCPtable)
 
+%%
+
+GPSimport=importGPSpoints('20250122_Seacliff_set-corrected_CameraA.txt')
+%%
+scope=1:length(PointNumber);
+file='';
+if all(PointNumber==GPSimport.Name)
+    for i=scope;
+        file=append(file,sprintf('      - [%.5f, %.5f, %.3f, %.f, %.f]\n',GPSimport.Northings(i), GPSimport.Eastings(i), GPSimport.Elevation(i), U(i), V(i)));
+    end
+end
+fprintf(file)
+% fopen()
+
+%% readCPG_CamDatabase
+% yamlData = yaml.loadFile(Path_to_SIO_CamDatabase);
+
+scope=length(yamlData);
+searchmatrix={};
+for i=1:scope
+    elements=fieldnames(yamlData{i});
+    for j=1:length(elements)
+        if elements{j}=="CamSN"
+            searchmatrix{i,j}=yamlData{i}.CamSN;
+        elseif elements{j}=="CamNickname"
+            searchmatrix{i,j}=yamlData{i}.CamNickname;
+        elseif checkDDateFormat(elements{j}) %handle date entries
+            searchmatrix{i,j}=datetime(str2num(elements{j}(2:end)), 'ConvertFrom','yyyymmdd');
+            % temp.stealdate(i)=datetime(str2num(elements{j}(2:end)), 'ConvertFrom','yyyymmdd');
+        else
+            searchmatrix{i,j}=elements{j};
+        end
+    end
+end
+
+datetimeIdx = cellfun(@(x) isa(x, 'datetime'), searchmatrix);
+
+% Extract datetime values
+datetimeValues = searchmatrix(datetimeIdx)
+
+
+function isValid = checkDDateFormat(inputStr)
+    pattern = '^D\d{8}$'; % D followed by exactly 8 digits
+    isValid = ~isempty(regexp(inputStr, pattern, 'once'));
+end

@@ -241,9 +241,6 @@ function gps_map_gui(UserPrefs)
     GPSpoints=importGPSpoints(UserPrefs.GPSSurveyFile);
     load("hawaiiS.txt"); % Load color map
 
-    % Determine number of image sets
-    NUM_IMGsets = size(unique(GPSpoints(:,2)),1);
-
     % Create main UI figure
     % Set figure size
     set(0,'units','pixels');
@@ -255,23 +252,22 @@ function gps_map_gui(UserPrefs)
     hold(geoax, 'on'); % Allow multiple drawings
     title(geoax, 'GPS Map');
 
-    % Plot the first point
-    plt = geoscatter(geoax, GPSpoints.Latitude(1), GPSpoints.Longitude(1), ...
-                     36, hawaiiS(1,:), "filled"); 
-    geobasemap(geoax, 'satellite');
-
-    % Plot all points
-    for i = 1:NUM_IMGsets+1
-        setname = "set" + i;
-        mask = strcmp(GPSpoints{:,2}, setname);
-        geoscatter(geoax, GPSpoints.Latitude(mask), GPSpoints.Longitude(mask), ...
-                   36, hawaiiS(mod(i-1,100)+1, :), "filled");
+    % Plot the GPS points as scattered Sets
+    NUM_IMGsets = size(unique(GPSpoints(:,2)),1); % Determine number of image sets
+    setnames=unique(GPSpoints(:,2)); % Find unique sets
+    NUM_IMGsets=size(setnames,1); % Calc size of loop for all sets
+    if NUM_IMGsets>100
+        error('GPS Survey contains more than 100 unique descriptions.  Please group sets appropriately')
+    end
+    
+    geoscatter(geoax, GPSpoints.Latitude(1), GPSpoints.Longitude(1), 36, hawaiiS(1, :), "filled");
+    geobasemap(geoax, "satellite")
+    for i=1:NUM_IMGsets
+        s=setnames.Code(i); % Loop through all unique Code names
+        mask=strcmp(GPSpoints{:,2},s); % Search points for number of sets
+        geoscatter(geoax,GPSpoints.Latitude(mask,:),GPSpoints.Longitude(mask,:),36,hawaiiS(mod(i-1, 100) + 1,:),"filled"); % ensure color rollover
     end    
-    hold(geoax, 'off');
-
-    % Store line handles for dynamic editing
-    guiData.drawnLine = []; 
-    guidata(GPSplot, guiData);
+    clear i
 
      % Create Buttons (normalized positions)
     btnPrev = uibutton(GPSplot, 'Text', 'Back', ...
@@ -279,12 +275,6 @@ function gps_map_gui(UserPrefs)
 
     btnNext = uibutton(GPSplot, 'Text', 'Forward', ...
         'Position', [230, 20, 120, 40], 'ButtonPushedFcn', @(~,~) nextCallback());
-
-    btnDraw = uibutton(GPSplot, 'Text', 'Draw Line', ...
-        'Position', [370, 20, 120, 40], 'ButtonPushedFcn', @(~,~) drawLine(geoax, GPSplot));
-
-    btnDelete = uibutton(GPSplot, 'Text', 'Delete Line', ...
-        'Position', [510, 20, 120, 40], 'ButtonPushedFcn', @(~,~) deleteLine(GPSplot));
 
     % Add Labels
     addLabels(geoax, GPSpoints);
@@ -298,56 +288,6 @@ end
 
 function nextCallback()
     disp('Forward button pressed'); % Placeholder for navigation logic
-end
-
-function drawLine(ax, fig)
-    guiData = guidata(fig);
-
-    % Select two points interactively
-    [lon, lat] = ginput(2);
-    if numel(lat) == 2 && numel(lon) == 2
-        % Draw the new line and store its handle
-        newLine = geoplot(ax, lat, lon, 'r-', 'LineWidth', 2); 
-
-        % Ensure GPS points stay visible
-        hold(ax, 'on');
-
-        % Store new line in an array
-        if ~isfield(guiData, 'drawnLines')
-            guiData.drawnLines = [];
-        end
-        guiData.drawnLines = [guiData.drawnLines; newLine]; 
-
-        guidata(fig, guiData); % Save updated handles
-    end
-end
-
-function deleteLine(fig)
-    guiData = guidata(fig);
-
-    if isfield(guiData, 'drawnLines') && ~isempty(guiData.drawnLines)
-        % Ask user which line to delete
-        numLines = numel(guiData.drawnLines);
-        choice = inputdlg(sprintf('Enter line number (1-%d) to delete:', numLines), ...
-                          'Delete Line', 1, {'1'});
-
-        if ~isempty(choice)
-            lineNum = str2double(choice{1});
-            if lineNum >= 1 && lineNum <= numLines
-                % Delete selected line
-                delete(guiData.drawnLines(lineNum));
-
-                % Remove from array
-                guiData.drawnLines(lineNum) = [];
-
-                guidata(fig, guiData); % Save updated handles
-            else
-                errordlg('Invalid selection! Choose a valid line number.', 'Error');
-            end
-        end
-    else
-        warndlg('No lines to delete!', 'Warning');
-    end
 end
 
 

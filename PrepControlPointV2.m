@@ -68,7 +68,7 @@ selection=uiconfirm(fig,msg,title, ...
 switch selection
     case 'Ready to start'
         % Close all figures, wipe all variables, start the program
-        close(fig);
+        close(findall(groot,'Type','figure'))
         close all; clear all; clc
         addpath(genpath(fileparts(mfilename('fullpath'))))
         disp(fileparts(mfilename('fullpath')));
@@ -113,58 +113,59 @@ clear cancelled DefaultOpsFile
 % camStruct=importCameraData(UserPrefs.CameraDB, searchKeyoption); %WIP use rowIDX to verify and date confusion about the selected camera!
 
 %% Select GPS file
-GPSpoints=importGPSpoints(UserPrefs.GPSSurveyFile);
-
-% Plot the GPS points as scattered Sets
-load("hawaiiS.txt"); %load color map (max 100 sets * # points/set = total GPS points possible)
-setnames=unique(GPSpoints(:,2)); % Find unique sets
-NUM_IMGsets=size(setnames,1); % Calc size of loop for all sets
-if NUM_IMGsets>100
-    error('GPS Survey contains more than 100 unique descriptions.  Please group sets appropriately')
-end
-
-plt=geoscatter(GPSpoints.Latitude(1),GPSpoints.Longitude(1),36,hawaiiS(1), "filled"); %plot the first point
-geobasemap satellite
-hold on
-for i=1:NUM_IMGsets
-    s=setnames.Code(i); % Loop through all unique Code names
-    mask=strcmp(GPSpoints{:,2},s); % Search points for number of sets
-    plt=geoscatter(GPSpoints.Latitude(mask,:),GPSpoints.Longitude(mask,:),36,hawaiiS(mod(i-1, 100) + 1,:),"filled"); % ensure color rollover
-end    
-clear i
-hold off
-
-% Single out 1 point
-% pointofintrest=13;
-% geoscatter(GPSpoints.Latitude(pointofintrest),GPSpoints.Longitude(pointofintrest),250,[0,0,0],"filled","p")
-
-% Set figure size
-set(0,'units','pixels');
-scr_siz = get(0,'ScreenSize');
-set(gcf,'Position',[floor([10 150 scr_siz(3)*0.8 scr_siz(4)*0.5])]);
-
-
-% Add labels
-a=GPSpoints.Name;
-b=num2str(a); c=cellstr(b);
-% Randomize the label direction by creating a unit vector.
-vec=-1+(1+1)*rand(length(GPSpoints.Name),2);
-dir=vec./(((vec(:,1).^2)+(vec(:,2).^2)).^(1/2));
-scale=0.000002; % offset text from point
-% dir(:)=0; % turn ON randomization by commenting out this line
-offsetx=-0.0000004+dir(:,1)*scale; % offset text on the point
-offsety=-0.00000008+dir(:,2)*scale; % offset text on the point
-text(GPSpoints.Latitude+offsety,GPSpoints.Longitude+offsetx,c)
-clear vec dir scale offsetx offsety a b c % clean up
-
-[~,surveyName,~]=fileparts(UserPrefs.GPSSurveyFile);
-figurename=strcat(surveyName,"_PLOT.png");
-saveas(plt,fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,figurename));
-clear surveyName figurename
+% GPSpoints=importGPSpoints(UserPrefs.GPSSurveyFile);
+% 
+% % Plot the GPS points as scattered Sets
+% load("hawaiiS.txt"); %load color map (max 100 sets * # points/set = total GPS points possible)
+% setnames=unique(GPSpoints(:,2)); % Find unique sets
+% NUM_IMGsets=size(setnames,1); % Calc size of loop for all sets
+% if NUM_IMGsets>100
+%     error('GPS Survey contains more than 100 unique descriptions.  Please group sets appropriately')
+% end
+% 
+% plt=geoscatter(GPSpoints.Latitude(1),GPSpoints.Longitude(1),36,hawaiiS(1), "filled"); %plot the first point
+% geobasemap satellite
+% hold on
+% for i=1:NUM_IMGsets
+%     s=setnames.Code(i); % Loop through all unique Code names
+%     mask=strcmp(GPSpoints{:,2},s); % Search points for number of sets
+%     plt=geoscatter(GPSpoints.Latitude(mask,:),GPSpoints.Longitude(mask,:),36,hawaiiS(mod(i-1, 100) + 1,:),"filled"); % ensure color rollover
+% end    
+% clear i
+% hold off
+% 
+% % Single out 1 point
+% % pointofintrest=13;
+% % geoscatter(GPSpoints.Latitude(pointofintrest),GPSpoints.Longitude(pointofintrest),250,[0,0,0],"filled","p")
+% 
+% % Set figure size
+% set(0,'units','pixels');
+% scr_siz = get(0,'ScreenSize');
+% set(gcf,'Position',[floor([10 150 scr_siz(3)*0.8 scr_siz(4)*0.5])]);
+% 
+% 
+% % Add labels
+% a=GPSpoints.Name;
+% b=num2str(a); c=cellstr(b);
+% % Randomize the label direction by creating a unit vector.
+% vec=-1+(1+1)*rand(length(GPSpoints.Name),2);
+% dir=vec./(((vec(:,1).^2)+(vec(:,2).^2)).^(1/2));
+% scale=0.000002; % offset text from point
+% % dir(:)=0; % turn ON randomization by commenting out this line
+% offsetx=-0.0000004+dir(:,1)*scale; % offset text on the point
+% offsety=-0.00000008+dir(:,2)*scale; % offset text on the point
+% text(GPSpoints.Latitude+offsety,GPSpoints.Longitude+offsetx,c)
+% clear vec dir scale offsetx offsety a b c % clean up
+% 
+% [~,surveyName,~]=fileparts(UserPrefs.GPSSurveyFile);
+% figurename=strcat(surveyName,"_PLOT.png");
+% saveas(plt,fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,figurename));
+% clear surveyName figurename
 
 %% %WIP Select a ROI for the GPS points!
 % - think about how the image box could also be pulled up to assist.
-gps_map_gui(UserPrefs)
+GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
+gps_map_gui(UserPrefs,GPSpoints);
 
 
 
@@ -188,6 +189,43 @@ files = dir(fullfile(UserPrefs.UsableIMGsFolder,[filesep,'*.tif']));
 ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ
 %}
 
+function UniqueGPSDescriptionsList=getSetNames(GPSpoints)
+    % Function to take GPS survey input and returns a string array of all
+    % unique descriptions found.  It will also organize descriptions
+    % matching "set(i)" where (i) is an incrimenting number used to group
+    % sets of GPS points that are all captured within 1 camera frame.  (We
+    % usually work with 5 targets at a time)
+
+    setnames = unique(GPSpoints(:,2)); % Find unique sets
+    setnames=string(table2cell(setnames)); % convert to string array
+
+    % Regular expression to extract numbers from "set(i)" format
+    expr = "set(\d+)";
+    
+    % Initialize variables
+    numValues = nan(size(setnames)); % Default to NaN for non-matching entries
+    
+    for i = 1:length(setnames)
+        match = regexp(setnames(i), expr, 'tokens', 'once'); % Find "set(i)" pattern
+        if ~isempty(match)
+            numValues(i) = str2double(match{1}); % Convert extracted number to double
+        else
+            numValues(i) = 99999;
+        end
+    end
+    
+    % Sort: Numeric values first, NaNs (non-matching) at the end
+    [~, order] = sort(numValues(~isnan(numValues)));
+    sortedSetnames = setnames(order);
+    
+    % Display result
+    % disp(sortedSetnames);
+    UniqueGPSDescriptionsList=sortedSetnames;
+end
+
+
+%% Pick Camera From Database
+%WIP -update for new CPG_CamDatabase YAML format
 function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_SIO_CamDatabase)
     opts = detectImportOptions(path_to_SIO_CamDatabase, "Delimiter", "\t");
 
@@ -236,79 +274,102 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_SIO_CamDatabase)
 end
 
 %% GPS map GUI
-function gps_map_gui(UserPrefs)
-    % Load GPS Data and Colormap
-    GPSpoints=importGPSpoints(UserPrefs.GPSSurveyFile);
+function gps_map_gui(UserPrefs, GPSpoints)
+    % Load Colormap
     load("hawaiiS.txt"); % Load color map
 
     % Create main UI figure
-    % Set figure size
-    set(0,'units','pixels');
-    scr_siz = get(0,'ScreenSize');
-    GPSplot = uifigure('Name', 'GPS Map Viewer', 'Position', [floor([10 150 scr_siz(3)*0.8 scr_siz(4)*0.5])]);
+    set(0, 'units', 'pixels');
+    scr_siz = get(0, 'ScreenSize');
+    
+    % Define figure width and height as a percentage of screen size
+    figWidth = 0.8 * scr_siz(3);
+    figHeight = 0.5 * scr_siz(4);
+    figX = (scr_siz(3) - figWidth) / 2;  % Center horizontally
+    figY = (scr_siz(4) - figHeight) / 2; % Center vertically
+    
+    % Create centered figure
+    GPSplot = uifigure('Name', 'GPS Map Viewer', ...
+        'Position', [figX, figY, figWidth, figHeight]);
 
-    % Create a geoaxes for plotting the GPS map
-    geoax = geoaxes(GPSplot, 'Position', [0.05, 0.2, 0.9, 0.75]); % Normalized
+
+    % Create a geoaxes inside the UI figure
+    geoax = geoaxes(GPSplot, 'Position', [0.05, 0.2, 0.9, 0.75]); 
     hold(geoax, 'on'); % Allow multiple drawings
     title(geoax, 'GPS Map');
+    
+    % Get unique descriptions (setnames)
+    setnames=getSetNames(GPSpoints)
+    NUM_IMGsets = numel(setnames); % Get number of unique sets
 
-    % Plot the GPS points as scattered Sets
-    NUM_IMGsets = size(unique(GPSpoints(:,2)),1); % Determine number of image sets
-    setnames=unique(GPSpoints(:,2)); % Find unique sets
-    NUM_IMGsets=size(setnames,1); % Calc size of loop for all sets
-    if NUM_IMGsets>100
-        error('GPS Survey contains more than 100 unique descriptions.  Please group sets appropriately')
+    % Plot all GPS points
+    geobasemap(geoax, "satellite");
+    for i = 1:NUM_IMGsets
+        mask = strcmp(GPSpoints{:,2}, setnames{i});
+        geoscatter(geoax, GPSpoints.Latitude(mask), GPSpoints.Longitude(mask), ...
+                   36, hawaiiS(mod(i-1, 100) + 1, :), "filled"); % Wrap colors properly
     end
-    
-    geoscatter(geoax, GPSpoints.Latitude(1), GPSpoints.Longitude(1), 36, hawaiiS(1, :), "filled");
-    geobasemap(geoax, "satellite")
-    for i=1:NUM_IMGsets
-        s=setnames.Code(i); % Loop through all unique Code names
-        mask=strcmp(GPSpoints{:,2},s); % Search points for number of sets
-        geoscatter(geoax,GPSpoints.Latitude(mask,:),GPSpoints.Longitude(mask,:),36,hawaiiS(mod(i-1, 100) + 1,:),"filled"); % ensure color rollover
-    end    
-    clear i
 
-     % Create Buttons (normalized positions)
+    % Overlay for highlighted points
+    highlightPlot = geoscatter(geoax, NaN, NaN, 100, 'r', 'pentagram','filled'); % Initially empty
+
+    hold(geoax, 'off');
+
+    % Current index tracker for setnames
+    currentIndex = 1;
+
+    % Relative button and label positioning
+    buttonWidth = 0.08;
+    buttonHeight = 0.04;
+    labelWidth = 0.10;
+    % labelHeight = buttonHeight; % they are the same
+    
+    % UI Label for current set description (centered)
+    descLabel = uilabel(GPSplot, 'Text', setnames{currentIndex}, ...
+        'FontSize', 14, 'HorizontalAlignment', 'center', ...
+        'Position', [figWidth * 0.43, ...
+                     scr_siz(4) * 0.02, labelWidth * scr_siz(3), buttonHeight * scr_siz(4)]);
+    
+    % Back Button (Left of center)
     btnPrev = uibutton(GPSplot, 'Text', 'Back', ...
-        'Position', [90, 20, 120, 40], 'ButtonPushedFcn', @(~,~) prevCallback());
-
+        'Position', [figWidth * 0.45 - (buttonWidth * scr_siz(3)), ...
+                     scr_siz(4) * 0.02, buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
+        'ButtonPushedFcn', @(~,~) prevCallback());
+    
+    % Forward Button (Right of center)
     btnNext = uibutton(GPSplot, 'Text', 'Forward', ...
-        'Position', [230, 20, 120, 40], 'ButtonPushedFcn', @(~,~) nextCallback());
+        'Position', [figWidth * 0.45 + (buttonWidth * scr_siz(3)), ...
+                     scr_siz(4) * 0.02, buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
+        'ButtonPushedFcn', @(~,~) nextCallback());
 
-    % Add Labels
-    addLabels(geoax, GPSpoints);
+
+    % Function to update highlighted points
+    function updateHighlight()
+        mask = strcmp(GPSpoints{:,2}, setnames{currentIndex});
+        highlightPlot.LatitudeData = GPSpoints.Latitude(mask);
+        highlightPlot.LongitudeData = GPSpoints.Longitude(mask);
+        descLabel.Text = setnames{currentIndex}; % Update text display
+    end
+
+    % Callback for Previous Button
+    function prevCallback()
+        if currentIndex > 1
+            currentIndex = currentIndex - 1;
+            updateHighlight();
+        end
+    end
+
+    % Callback for Next Button
+    function nextCallback()
+        if currentIndex < NUM_IMGsets
+            currentIndex = currentIndex + 1;
+            updateHighlight();
+        end
+    end
+
+    % Initial Highlight Update
+    updateHighlight();
 end
-
-% Callback Functions
-
-function prevCallback()
-    disp('Back button pressed'); % Placeholder for navigation logic
-end
-
-function nextCallback()
-    disp('Forward button pressed'); % Placeholder for navigation logic
-end
-
-
-
-% Function to Add Labels to Points
-function addLabels(ax, GPSpoints)
-    a = GPSpoints.Name;
-    b = num2str(a);
-    c = cellstr(b);
-    
-    % Randomize the label direction by creating a unit vector.
-    vec = -1 + (1+1) * rand(length(GPSpoints.Name), 2);
-    dir = vec ./ sqrt(vec(:,1).^2 + vec(:,2).^2);
-    
-    scale = 0.000002; % Offset text from point
-    offsetx = -0.0000004 + dir(:,1) * scale; 
-    offsety = -0.00000008 + dir(:,2) * scale; 
-
-    text(ax, GPSpoints.Latitude + offsety, GPSpoints.Longitude + offsetx, c);
-end
-
 
 %% Img copier GUI
 

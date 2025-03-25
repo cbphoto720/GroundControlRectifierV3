@@ -108,71 +108,36 @@ end
 clear cancelled DefaultOpsFile
 
 %% Pick Camera from database
-% DBinfotable=readCPG_CamDatabase(UserPrefs.CameraDB);
+%WIP - Pick camera so that filename extension can throw out bad file
+%extensions
+DBinfotable=readCPG_CamDatabase(UserPrefs.CameraDB);
 
 % camStruct=importCameraData(UserPrefs.CameraDB, searchKeyoption); %WIP use rowIDX to verify and date confusion about the selected camera!
 
+%% Link usable img to Survey Sets
+files = dir(fullfile(UserPrefs.UsableIMGsFolder,[filesep,'*.tif']));
+files=struct2table(files);
+files.datetime=datetime(files.datenum,'ConvertFrom','datenum'); % Create datetime column
+
+% Calculate closest captured image with Datetime
+numpoints=length(GPSpoints.Time);
+dif=NaN(numpoints,1);
+minIND=zeros(numpoints,1);
+for i=1:numpoints
+    timediff=files.datetime-repmat(GPSpoints.Time(i),length(files.datetime),1);
+    timediff(timediff<0)=NaN;
+    [~,minIND(i)]=min(timediff);
+end
+
 %% Select GPS file
-% GPSpoints=importGPSpoints(UserPrefs.GPSSurveyFile);
-% 
-% % Plot the GPS points as scattered Sets
-% load("hawaiiS.txt"); %load color map (max 100 sets * # points/set = total GPS points possible)
-% setnames=unique(GPSpoints(:,2)); % Find unique sets
-% NUM_IMGsets=size(setnames,1); % Calc size of loop for all sets
-% if NUM_IMGsets>100
-%     error('GPS Survey contains more than 100 unique descriptions.  Please group sets appropriately')
-% end
-% 
-% plt=geoscatter(GPSpoints.Latitude(1),GPSpoints.Longitude(1),36,hawaiiS(1), "filled"); %plot the first point
-% geobasemap satellite
-% hold on
-% for i=1:NUM_IMGsets
-%     s=setnames.Code(i); % Loop through all unique Code names
-%     mask=strcmp(GPSpoints{:,2},s); % Search points for number of sets
-%     plt=geoscatter(GPSpoints.Latitude(mask,:),GPSpoints.Longitude(mask,:),36,hawaiiS(mod(i-1, 100) + 1,:),"filled"); % ensure color rollover
-% end    
-% clear i
-% hold off
-% 
-% % Single out 1 point
-% % pointofintrest=13;
-% % geoscatter(GPSpoints.Latitude(pointofintrest),GPSpoints.Longitude(pointofintrest),250,[0,0,0],"filled","p")
-% 
-% % Set figure size
-% set(0,'units','pixels');
-% scr_siz = get(0,'ScreenSize');
-% set(gcf,'Position',[floor([10 150 scr_siz(3)*0.8 scr_siz(4)*0.5])]);
-% 
-% 
-% % Add labels
-% a=GPSpoints.Name;
-% b=num2str(a); c=cellstr(b);
-% % Randomize the label direction by creating a unit vector.
-% vec=-1+(1+1)*rand(length(GPSpoints.Name),2);
-% dir=vec./(((vec(:,1).^2)+(vec(:,2).^2)).^(1/2));
-% scale=0.000002; % offset text from point
-% % dir(:)=0; % turn ON randomization by commenting out this line
-% offsetx=-0.0000004+dir(:,1)*scale; % offset text on the point
-% offsety=-0.00000008+dir(:,2)*scale; % offset text on the point
-% text(GPSpoints.Latitude+offsety,GPSpoints.Longitude+offsetx,c)
-% clear vec dir scale offsetx offsety a b c % clean up
-% 
-% [~,surveyName,~]=fileparts(UserPrefs.GPSSurveyFile);
-% figurename=strcat(surveyName,"_PLOT.png");
-% saveas(plt,fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,figurename));
-% clear surveyName figurename
 
 %% %WIP Select a ROI for the GPS points!
 % - think about how the image box could also be pulled up to assist.
 GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
+
 gps_map_gui(UserPrefs,GPSpoints);
 
-
-
-%% Create usable img copies
-% have user select the number of target in each img to determine how many
-% copies (camera-agnostic)  Should be saved in PCP_DefaultOptions.
-files = dir(fullfile(UserPrefs.UsableIMGsFolder,[filesep,'*.tif']));
+%%
 % for fileIDX=1:length(filenames)
     pickGCPsGUI(files(1).name); %WIP pass in filenames and loop through
 % end
@@ -222,18 +187,15 @@ function UniqueGPSDescriptionsList=getSetNames(GPSpoints)
     % disp(sortedSetnames);
     UniqueGPSDescriptionsList=sortedSetnames;
 end
-
+%%
+PickCamFromDatabase(path_to_CPG_CamDatabase_folder)
 
 %% Pick Camera From Database
 %WIP -update for new CPG_CamDatabase YAML format
-function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_SIO_CamDatabase)
-    opts = detectImportOptions(path_to_SIO_CamDatabase, "Delimiter", "\t");
-
-    opts.SelectedVariableNames = ["CamSN","CamNickname","DateofGCP"];
-    opts.MissingRule="omitrow";
-    CameraOptionsTable=readtable(path_to_SIO_CamDatabase,opts);
-
-    CameraOptionsTable.Checkbox=false(height(CameraOptionsTable),1);
+function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder)
+    addpath(genpath(path_to_CPG_CamDatabase_folder));
+    CameraOptionsTable=readCPG_CamDatabase('CPG_CamDatabase.yaml');
+    CameraOptionsTable.DateofGCP=[]; % remove date for display purposes
 
     Title = 'Pick camera profile from database';
     Options.Resize = 'on';
@@ -252,7 +214,7 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_SIO_CamDatabase)
     Prompt(end+1,:) = {'Item Table','Table',[]};
     Formats(2,1).type = 'table';
     % Formats(1,1).format = {'char', {'left','right'}, 'numeric' 'logical'}; % table (= table in main dialog) / window (= table in separate dialog)
-    Formats(2,1).items = {'CamSN' 'CamNickname' 'Date'};
+    Formats(2,1).items = {'CamSN' 'CamNickname'};
     Formats(2,1).size = [-1 -1];
     DefAns.Table = table2cell(CameraOptionsTable);
 

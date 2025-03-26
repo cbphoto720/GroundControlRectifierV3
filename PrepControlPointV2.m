@@ -108,32 +108,60 @@ end
 clear cancelled DefaultOpsFile
 
 %% Pick Camera from database
-%WIP - Pick camera so that filename extension can throw out bad file
-%extensions
-DBinfotable=readCPG_CamDatabase(UserPrefs.CameraDB);
+GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
 
-% camStruct=importCameraData(UserPrefs.CameraDB, searchKeyoption); %WIP use rowIDX to verify and date confusion about the selected camera!
+[UserPrefs.CamSN,UserPrefs.CamIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder);
+CameraDBentry=readCPG_CamDatabase('CPG_CamDatabase.yaml', CamSN=UserPrefs.CamSN);
 
-%% Link usable img to Survey Sets
+% Find files in usable img folder 
 files = dir(fullfile(UserPrefs.UsableIMGsFolder,[filesep,'*.tif']));
 files=struct2table(files);
 files.datetime=datetime(files.datenum,'ConvertFrom','datenum'); % Create datetime column
 
-% Calculate closest captured image with Datetime
+%
+%WIP - Temporary until Filename is added to CPG_CamDatabase
+if contains(CameraDBentry.CamNickname, "Seacliff")
+    filemask=contains(files.name, strcat("Seacliff_",string(CameraDBentry.CamSN)));
+else
+    error(['Could not find any files in usable-imgs folder matching your selected camera SN.\n' ...
+        'Filename: %s'],'') %WIP improve this error message to list filename once data is available in CPG_CamDatabase
+end
+files=files(filemask,:); % Remove files that are captured from different cameras
+
+% Calculate closest survey date with captured image date
 numpoints=length(GPSpoints.Time);
-dif=NaN(numpoints,1);
+dif=seconds(zeros(numpoints,1));
 minIND=zeros(numpoints,1);
 for i=1:numpoints
     timediff=files.datetime-repmat(GPSpoints.Time(i),length(files.datetime),1);
     timediff(timediff<0)=NaN;
-    [~,minIND(i)]=min(timediff);
+    [dif(i),minIND(i)]=min(timediff, [], 'omitnan');
+end
+minIND(isnan(dif))=NaN(); % remove all values associated with NaN
+
+setnames=getSetNames(GPSpoints);
+% mask = strcmp(GPSpoints{:,2}, setnames{i});
+
+% setnames=getSetNames(GPSpoints);
+% Link Img filename to survey set number
+INDvalues=unique(minIND);
+INDvalues(isnan(INDvalues))=[];
+GPSpoints.FileIDX(:)=repmat("",height(GPSpoints),1);
+for i=1:length(INDvalues)
+
+    mask = minIND== INDvalues(i);
+    maskedIndices = find(mask); 
+    [shortestDif,localIDX]=min(dif(maskedIndices));
+    linkedIDX=maskedIndices(localIDX);
+
+    SetMask=GPSpoints.Code(linkedIDX); % Find the set# of associated min value
+    % Apply filename to all of that set#
+    GPSpoints.FileIDX(GPSpoints.Code==SetMask)=repmat(files.name(INDvalues(i)),length(GPSpoints.FileIDX(GPSpoints.Code==SetMask)),1);
 end
 
 %% Select GPS file
 
 %% %WIP Select a ROI for the GPS points!
-% - think about how the image box could also be pulled up to assist.
-GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
 
 gps_map_gui(UserPrefs,GPSpoints);
 
@@ -187,8 +215,6 @@ function UniqueGPSDescriptionsList=getSetNames(GPSpoints)
     % disp(sortedSetnames);
     UniqueGPSDescriptionsList=sortedSetnames;
 end
-%%
-PickCamFromDatabase(path_to_CPG_CamDatabase_folder)
 
 %% Pick Camera From Database
 %WIP -update for new CPG_CamDatabase YAML format
@@ -196,6 +222,8 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_fo
     addpath(genpath(path_to_CPG_CamDatabase_folder));
     CameraOptionsTable=readCPG_CamDatabase('CPG_CamDatabase.yaml');
     CameraOptionsTable.DateofGCP=[]; % remove date for display purposes
+    CameraOptionsTable.CamNickname=char(CameraOptionsTable.CamNickname); % convert to char
+    CameraOptionsTable.Checkbox=false(height(CameraOptionsTable),1); % add checkbox for user selection
 
     Title = 'Pick camera profile from database';
     Options.Resize = 'on';
@@ -207,7 +235,7 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_fo
     Prompt = {};
     Formats = {};
 
-    Prompt(1,:) = {['Select only 1 camera station from the checkbox!'], [], []};
+    Prompt(1,:) = {'Select only 1 camera station from the checkbox!', [], []};
     Formats(1,1).type = 'text';
     Formats(1,1).size = [-1 0];
 
@@ -217,6 +245,8 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_fo
     Formats(2,1).items = {'CamSN' 'CamNickname'};
     Formats(2,1).size = [-1 -1];
     DefAns.Table = table2cell(CameraOptionsTable);
+    % DefAns.Table = cellfun(@string, table2cell(CameraOptionsTable), 'UniformOutput', false);
+
 
     [answers, cancelled] = inputsdlg(Prompt, Title, Formats, DefAns, Options);
 
@@ -246,7 +276,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
     
     % Define figure width and height as a percentage of screen size
     figWidth = 0.8 * scr_siz(3);
-    figHeight = 0.5 * scr_siz(4);
+    figHeight = 0.7 * scr_siz(4);
     figX = (scr_siz(3) - figWidth) / 2;  % Center horizontally
     figY = (scr_siz(4) - figHeight) / 2; % Center vertically
     
@@ -254,14 +284,13 @@ function gps_map_gui(UserPrefs, GPSpoints)
     GPSplot = uifigure('Name', 'GPS Map Viewer', ...
         'Position', [figX, figY, figWidth, figHeight]);
 
-
-    % Create a geoaxes inside the UI figure
-    geoax = geoaxes(GPSplot, 'Position', [0.05, 0.2, 0.9, 0.75]); 
+    % Create a geoaxes inside the UI figure for the GPS map (left side)
+    geoax = geoaxes(GPSplot, 'Position', [0.05, 0.2, 0.45, 0.7]); 
     hold(geoax, 'on'); % Allow multiple drawings
     title(geoax, 'GPS Map');
     
     % Get unique descriptions (setnames)
-    setnames=getSetNames(GPSpoints)
+    setnames = getSetNames(GPSpoints);
     NUM_IMGsets = numel(setnames); % Get number of unique sets
 
     % Plot all GPS points
@@ -277,33 +306,56 @@ function gps_map_gui(UserPrefs, GPSpoints)
 
     hold(geoax, 'off');
 
+    % Create axes for the image display (right side)
+    ax_img = axes(GPSplot, 'Position', [0.55, 0.2, 0.4, 0.7]);  % Adjusted for side-by-side
+
     % Current index tracker for setnames
     currentIndex = 1;
 
-    % Relative button and label positioning
-    buttonWidth = 0.08;
-    buttonHeight = 0.04;
-    labelWidth = 0.10;
-    % labelHeight = buttonHeight; % they are the same
-    
+    % Create a grid layout for the buttons and labels at the bottom
+    % buttonPanel = uipanel(GPSplot, 'Position', [0.05, 0.05, 0.8, 0.1], 'BackgroundColor', 'white'); % Added BackgroundColor for visibility
+    % buttonPanel.Visible = 'on';  % Ensure it's visible
+
+    % Button size
+    buttonWidth = 0.2;
+    buttonHeight = 0.06;
+
     % UI Label for current set description (centered)
     descLabel = uilabel(GPSplot, 'Text', setnames{currentIndex}, ...
         'FontSize', 14, 'HorizontalAlignment', 'center', ...
-        'Position', [figWidth * 0.43, ...
-                     scr_siz(4) * 0.02, labelWidth * scr_siz(3), buttonHeight * scr_siz(4)]);
+        'Position', [0, ...
+                     scr_siz(4) * 0.02, 0.25 * scr_siz(3), buttonHeight * scr_siz(4)]);
+
+    % Button size
+    buttonWidth = 0.05;  % Adjusted width to fit buttons better
+    buttonHeight = 0.06;
     
+    % % Back Button (Left of center)
+    % btnPrev = uibutton(GPSplot, 'Text', 'Back', ...
+    %     'Position', [figWidth * 0.45 - (buttonWidth * scr_siz(3)), ...
+    %                  scr_siz(4) * 0.02, buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
+    %     'ButtonPushedFcn', @(~,~) prevCallback());
+    % 
+    % % Forward Button (Right of center)
+    % btnNext = uibutton(GPSplot, 'Text', 'Forward', ...
+    %     'Position', [figWidth * 0.45 + (buttonWidth * scr_siz(3)), ...
+    %                  scr_siz(4) * 0.02, buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
+    %     'ButtonPushedFcn', @(~,~) nextCallback());
+
     % Back Button (Left of center)
     btnPrev = uibutton(GPSplot, 'Text', 'Back', ...
-        'Position', [figWidth * 0.45 - (buttonWidth * scr_siz(3)), ...
-                     scr_siz(4) * 0.02, buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
+        'Position', [60, 30,  buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
         'ButtonPushedFcn', @(~,~) prevCallback());
-    
+
     % Forward Button (Right of center)
     btnNext = uibutton(GPSplot, 'Text', 'Forward', ...
-        'Position', [figWidth * 0.45 + (buttonWidth * scr_siz(3)), ...
-                     scr_siz(4) * 0.02, buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
+        'Position', [420, 30,  buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
         'ButtonPushedFcn', @(~,~) nextCallback());
-
+    
+    % "Ready to Select Region" Button
+    btnSelectRegion = uibutton(GPSplot, 'Text', 'Select Region', ...
+        'Position', [820, 30,  buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
+        'ButtonPushedFcn', @(~,~) selectRegionCallback());
 
     % Function to update highlighted points
     function updateHighlight()
@@ -311,6 +363,24 @@ function gps_map_gui(UserPrefs, GPSpoints)
         highlightPlot.LatitudeData = GPSpoints.Latitude(mask);
         highlightPlot.LongitudeData = GPSpoints.Longitude(mask);
         descLabel.Text = setnames{currentIndex}; % Update text display
+        updateImage(); % Update the image when the GPS set changes
+    end
+
+    % Function to update the image display
+    function updateImage()
+        % Get the image filename from FileIDX based on currentIndex
+        mask = strcmp(GPSpoints{:,2}, setnames{currentIndex});
+        imgfile = GPSpoints.FileIDX(mask);
+        imgfile = imgfile(1);
+        
+        if strcmp(imgfile,"")
+            %do nothing for now
+        else
+            % Load the image
+            img = imread(imgfile);
+            % Display the image in the image axes (ax_img)
+            imshow(img, 'Parent', ax_img);
+        end
     end
 
     % Callback for Previous Button
@@ -329,9 +399,32 @@ function gps_map_gui(UserPrefs, GPSpoints)
         end
     end
 
-    % Initial Highlight Update
+    % Callback for "Ready to Select Region" Button
+    function selectRegionCallback()
+        % Prompt user to draw a polygon around the points visible to the camera
+        f = msgbox("Draw a polygon around the points visible to the cam");
+        uiwait(f);  % Wait for the message box to close
+        
+        % Allow user to draw a polygon
+        roi = drawpolygon();
+        
+        % Check if a region was selected
+        if size(roi.Position, 1) == 0
+            disp("Failed to detect region of interest. Try again.");
+        else
+            % Get the GPS points inside the drawn polygon (region of interest)
+            GPSmask = inROI(roi, GPSpoints.Latitude, GPSpoints.Longitude);
+            disp("Region selected successfully.");
+            % You can now use 'GPSmask' for further processing
+        end
+    end
+
+    % Initial Highlight and Image Update
     updateHighlight();
 end
+
+
+
 
 %% Img copier GUI
 

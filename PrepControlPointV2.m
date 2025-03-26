@@ -109,9 +109,11 @@ clear cancelled DefaultOpsFile
 
 %% Pick Camera from database
 GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
+%WIP TEMP FIX
+path_to_CPG_CamDatabase_folder="C:\Users\Carson\Documents\Git\CPG_CameraDatabase";
 
 [UserPrefs.CamSN,UserPrefs.CamIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder);
-CameraDBentry=readCPG_CamDatabase('CPG_CamDatabase.yaml', CamSN=UserPrefs.CamSN);
+CameraDBentry=readCPG_CamDatabase(fullfile(path_to_CPG_CamDatabase_folder,'CPG_CamDatabase.yaml'), CamSN=UserPrefs.CamSN);
 
 % Find files in usable img folder 
 files = dir(fullfile(UserPrefs.UsableIMGsFolder,[filesep,'*.tif']));
@@ -220,7 +222,7 @@ end
 %WIP -update for new CPG_CamDatabase YAML format
 function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder)
     addpath(genpath(path_to_CPG_CamDatabase_folder));
-    CameraOptionsTable=readCPG_CamDatabase('CPG_CamDatabase.yaml');
+    CameraOptionsTable=readCPG_CamDatabase(fullfile(path_to_CPG_CamDatabase_folder,'CPG_CamDatabase.yaml'));
     CameraOptionsTable.DateofGCP=[]; % remove date for display purposes
     CameraOptionsTable.CamNickname=char(CameraOptionsTable.CamNickname); % convert to char
     CameraOptionsTable.Checkbox=false(height(CameraOptionsTable),1); % add checkbox for user selection
@@ -406,7 +408,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
         uiwait(f);  % Wait for the message box to close
         
         % Allow user to draw a polygon
-        roi = drawpolygon();
+        roi = drawpolygon(geoax);
         
         % Check if a region was selected
         if size(roi.Position, 1) == 0

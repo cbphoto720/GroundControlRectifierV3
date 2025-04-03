@@ -287,6 +287,17 @@ end
 
 imgfile='Seacliff_22296748_1737653186039.tif';
 interactive_zoom_display(imgfile);
+
+%% PickControlPoint tests
+
+
+%%
+dif=files.datetime-repmat(GPSpoints.Time(14),length(files.datetime),1)
+
+
+%%
+
+
 %%
 % Get img filenames
 files = dir('C:\Users\Carson\Documents\Git\SIOCameraRectification\data\20250122\usable-imgs\*.tif');

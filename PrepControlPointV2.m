@@ -184,39 +184,39 @@ gps_map_gui(UserPrefs,GPSpoints);
 ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ
 %}
 
-function UniqueGPSDescriptionsList=getSetNames(GPSpoints)
-    % Function to take GPS survey input and returns a string array of all
-    % unique descriptions found.  It will also organize descriptions
-    % matching "set(i)" where (i) is an incrimenting number used to group
-    % sets of GPS points that are all captured within 1 camera frame.  (We
-    % usually work with 5 targets at a time)
-
-    setnames = unique(GPSpoints(:,2)); % Find unique sets
-    setnames=string(table2cell(setnames)); % convert to string array
-
-    % Regular expression to extract numbers from "set(i)" format
-    expr = "set(\d+)";
-    
-    % Initialize variables
-    numValues = nan(size(setnames)); % Default to NaN for non-matching entries
-    
-    for i = 1:length(setnames)
-        match = regexp(setnames(i), expr, 'tokens', 'once'); % Find "set(i)" pattern
-        if ~isempty(match)
-            numValues(i) = str2double(match{1}); % Convert extracted number to double
-        else
-            numValues(i) = 99999;
-        end
-    end
-    
-    % Sort: Numeric values first, NaNs (non-matching) at the end
-    [~, order] = sort(numValues(~isnan(numValues)));
-    sortedSetnames = setnames(order);
-    
-    % Display result
-    % disp(sortedSetnames);
-    UniqueGPSDescriptionsList=sortedSetnames;
-end
+% function UniqueGPSDescriptionsList=getSetNames(GPSpoints)
+%     % Function to take GPS survey input and returns a string array of all
+%     % unique descriptions found.  It will also organize descriptions
+%     % matching "set(i)" where (i) is an incrimenting number used to group
+%     % sets of GPS points that are all captured within 1 camera frame.  (We
+%     % usually work with 5 targets at a time)
+% 
+%     setnames = unique(GPSpoints(:,2)); % Find unique sets
+%     setnames=string(table2cell(setnames)); % convert to string array
+% 
+%     % Regular expression to extract numbers from "set(i)" format
+%     expr = "set(\d+)";
+% 
+%     % Initialize variables
+%     numValues = nan(size(setnames)); % Default to NaN for non-matching entries
+% 
+%     for i = 1:length(setnames)
+%         match = regexp(setnames(i), expr, 'tokens', 'once'); % Find "set(i)" pattern
+%         if ~isempty(match)
+%             numValues(i) = str2double(match{1}); % Convert extracted number to double
+%         else
+%             numValues(i) = 99999;
+%         end
+%     end
+% 
+%     % Sort: Numeric values first, NaNs (non-matching) at the end
+%     [~, order] = sort(numValues(~isnan(numValues)));
+%     sortedSetnames = setnames(order);
+% 
+%     % Display result
+%     % disp(sortedSetnames);
+%     UniqueGPSDescriptionsList=sortedSetnames;
+% end
 
 %% Pick Camera From Database
 %WIP -update for new CPG_CamDatabase YAML format
@@ -268,165 +268,155 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_fo
 end
 
 %% GPS map GUI
-function gps_map_gui(UserPrefs, GPSpoints)
-    % Load Colormap
-    load("hawaiiS.txt"); % Load color map
-
-    % Create main UI figure
-    set(0, 'units', 'pixels');
-    scr_siz = get(0, 'ScreenSize');
-    
-    % Define figure width and height as a percentage of screen size
-    figWidth = 0.8 * scr_siz(3);
-    figHeight = 0.7 * scr_siz(4);
-    figX = (scr_siz(3) - figWidth) / 2;  % Center horizontally
-    figY = (scr_siz(4) - figHeight) / 2; % Center vertically
-    
-    % Create centered figure
-    GPSplot = uifigure('Name', 'GPS Map Viewer', ...
-        'Position', [figX, figY, figWidth, figHeight]);
-
-    % Create a geoaxes inside the UI figure for the GPS map (left side)
-    geoax = geoaxes(GPSplot, 'Position', [0.05, 0.2, 0.45, 0.7]); 
-    hold(geoax, 'on'); % Allow multiple drawings
-    title(geoax, 'GPS Map');
-    
-    % Get unique descriptions (setnames)
-    setnames = getSetNames(GPSpoints);
-    NUM_IMGsets = numel(setnames); % Get number of unique sets
-
-    % Plot all GPS points
-    geobasemap(geoax, "satellite");
-    for i = 1:NUM_IMGsets
-        mask = strcmp(GPSpoints{:,2}, setnames{i});
-        geoscatter(geoax, GPSpoints.Latitude(mask), GPSpoints.Longitude(mask), ...
-                   36, hawaiiS(mod(i-1, 100) + 1, :), "filled"); % Wrap colors properly
-    end
-
-    % Overlay for highlighted points
-    highlightPlot = geoscatter(geoax, NaN, NaN, 100, 'r', 'pentagram','filled'); % Initially empty
-
-    hold(geoax, 'off');
-
-    % Create axes for the image display (right side)
-    ax_img = axes(GPSplot, 'Position', [0.55, 0.2, 0.4, 0.7]);  % Adjusted for side-by-side
-
-    % Current index tracker for setnames
-    currentIndex = 1;
-
-    % Create a grid layout for the buttons and labels at the bottom
-    % buttonPanel = uipanel(GPSplot, 'Position', [0.05, 0.05, 0.8, 0.1], 'BackgroundColor', 'white'); % Added BackgroundColor for visibility
-    % buttonPanel.Visible = 'on';  % Ensure it's visible
-
-    % Button size
-    buttonWidth = 0.2;
-    buttonHeight = 0.06;
-
-    % UI Label for current set description (centered)
-    descLabel = uilabel(GPSplot, 'Text', setnames{currentIndex}, ...
-        'FontSize', 14, 'HorizontalAlignment', 'center', ...
-        'Position', [0, ...
-                     scr_siz(4) * 0.02, 0.25 * scr_siz(3), buttonHeight * scr_siz(4)]);
-
-    % Button size
-    buttonWidth = 0.05;  % Adjusted width to fit buttons better
-    buttonHeight = 0.06;
-    
-    % % Back Button (Left of center)
-    % btnPrev = uibutton(GPSplot, 'Text', 'Back', ...
-    %     'Position', [figWidth * 0.45 - (buttonWidth * scr_siz(3)), ...
-    %                  scr_siz(4) * 0.02, buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
-    %     'ButtonPushedFcn', @(~,~) prevCallback());
-    % 
-    % % Forward Button (Right of center)
-    % btnNext = uibutton(GPSplot, 'Text', 'Forward', ...
-    %     'Position', [figWidth * 0.45 + (buttonWidth * scr_siz(3)), ...
-    %                  scr_siz(4) * 0.02, buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
-    %     'ButtonPushedFcn', @(~,~) nextCallback());
-
-    % Back Button (Left of center)
-    btnPrev = uibutton(GPSplot, 'Text', 'Back', ...
-        'Position', [60, 30,  buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
-        'ButtonPushedFcn', @(~,~) prevCallback());
-
-    % Forward Button (Right of center)
-    btnNext = uibutton(GPSplot, 'Text', 'Forward', ...
-        'Position', [420, 30,  buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
-        'ButtonPushedFcn', @(~,~) nextCallback());
-    
-    % "Ready to Select Region" Button
-    btnSelectRegion = uibutton(GPSplot, 'Text', 'Select Region', ...
-        'Position', [820, 30,  buttonWidth * scr_siz(3), buttonHeight * scr_siz(4)], ...
-        'ButtonPushedFcn', @(~,~) selectRegionCallback());
-
-    % Function to update highlighted points
-    function updateHighlight()
-        mask = strcmp(GPSpoints{:,2}, setnames{currentIndex});
-        highlightPlot.LatitudeData = GPSpoints.Latitude(mask);
-        highlightPlot.LongitudeData = GPSpoints.Longitude(mask);
-        descLabel.Text = setnames{currentIndex}; % Update text display
-        updateImage(); % Update the image when the GPS set changes
-    end
-
-    % Function to update the image display
-    function updateImage()
-        % Get the image filename from FileIDX based on currentIndex
-        mask = strcmp(GPSpoints{:,2}, setnames{currentIndex});
-        imgfile = GPSpoints.FileIDX(mask);
-        imgfile = imgfile(1);
-        
-        if strcmp(imgfile,"")
-            %do nothing for now
-        else
-            % Load the image
-            img = imread(imgfile);
-            % Display the image in the image axes (ax_img)
-            imshow(img, 'Parent', ax_img);
-        end
-    end
-
-    % Callback for Previous Button
-    function prevCallback()
-        if currentIndex > 1
-            currentIndex = currentIndex - 1;
-            updateHighlight();
-        end
-    end
-
-    % Callback for Next Button
-    function nextCallback()
-        if currentIndex < NUM_IMGsets
-            currentIndex = currentIndex + 1;
-            updateHighlight();
-        end
-    end
-
-    % Callback for "Ready to Select Region" Button
-    function selectRegionCallback()
-        % Prompt user to draw a polygon around the points visible to the camera
-        f = msgbox("Draw a polygon around the points visible to the cam");
-        uiwait(f);  % Wait for the message box to close
-        
-        % Allow user to draw a polygon
-        roi = drawpolygon(geoax);
-        
-        % Check if a region was selected
-        if size(roi.Position, 1) == 0
-            disp("Failed to detect region of interest. Try again.");
-        else
-            % Get the GPS points inside the drawn polygon (region of interest)
-            GPSmask = inROI(roi, GPSpoints.Latitude, GPSpoints.Longitude);
-            disp("Region selected successfully.");
-            % You can now use 'GPSmask' for further processing
-        end
-    end
-
-    % Initial Highlight and Image Update
-    updateHighlight();
-end
-
-
-
+% function gps_map_gui(UserPrefs, GPSpoints)
+%     % Load Colormap
+%     load("hawaiiS.txt"); % Load color map
+% 
+%     % Get screen size for positioning the figure
+%     set(0, 'units', 'pixels');
+%     scr_siz = get(0, 'ScreenSize');
+% 
+%     % Define figure width and height as a percentage of screen size
+%     figWidth = 0.8 * scr_siz(3);
+%     figHeight = 0.7 * scr_siz(4);
+%     figX = (scr_siz(3) - figWidth) / 2;  % Center horizontally
+%     figY = (scr_siz(4) - figHeight) / 2; % Center vertically
+% 
+%     % Create main UI figure
+%     GPSplot = uifigure('Name', 'GPS Map Viewer', ...
+%         'Position', [figX, figY, figWidth, figHeight]);
+% 
+%     % Create GridLayout for the main figure
+%     app.GridLayout = uigridlayout(GPSplot);
+%     app.GridLayout.RowHeight = {'4x', '1x'};
+%     app.GridLayout.ColumnWidth = {'1x', '1x'};
+% 
+%     % Create UIAxes (left side for GPS map)
+%     app.UIAxes = geoaxes(app.GridLayout);
+%     app.UIAxes.Layout.Row = 1;
+%     app.UIAxes.Layout.Column = 1;
+%     hold(app.UIAxes, 'on'); % Allow multiple drawings
+%     title(app.UIAxes, 'GPS Map');
+% 
+%     % Get unique descriptions (setnames)
+%     setnames = getSetNames(GPSpoints);
+%     NUM_IMGsets = numel(setnames); % Get number of unique sets
+% 
+%     % Plot all GPS points
+%     geobasemap(app.UIAxes, "satellite");
+%     for i = 1:NUM_IMGsets
+%         mask = strcmp(GPSpoints{:,2}, setnames{i});
+%         geoscatter(app.UIAxes, GPSpoints.Latitude(mask), GPSpoints.Longitude(mask), ...
+%                    36, hawaiiS(mod(i-1, 100) + 1, :), "filled"); % Wrap colors properly
+%     end
+% 
+%     % Overlay for highlighted points
+%     highlightPlot = geoscatter(app.UIAxes, NaN, NaN, 100, 'r', 'pentagram','filled'); % Initially empty
+%     hold(app.UIAxes, 'off');
+% 
+%     % Create UIAxes2 (right side for image display)
+%     app.UIAxes2 = axes(app.GridLayout);
+%     app.UIAxes2.Layout.Row = 1;
+%     app.UIAxes2.Layout.Column = 2;
+% 
+%     % Create a description label for the current set
+%     app.GPS_desc_label = uilabel(app.GridLayout, 'Text', setnames{1}, ...
+%         'FontSize', 14, 'HorizontalAlignment', 'center');
+%     app.GPS_desc_label.Layout.Row = 1;
+%     app.GPS_desc_label.Layout.Column = [1 2];
+%     % app.GPS_desc_label.Layout.ColumnSpan = 2; % Span across both columns
+% 
+%     % Create GridLayout2 for buttons at the bottom
+%     app.GridLayout2 = uigridlayout(app.GridLayout);
+%     app.GridLayout2.Layout.Row = 2;
+%     app.GridLayout2.Layout.Column = 1;
+%     app.GridLayout2.ColumnWidth = {'0.5x', '0.5x', '0.5x', '1x', '0.75x'};
+% 
+%     % Create Back Button (left side)
+%     app.BackButton = uibutton(app.GridLayout2, 'push', 'Text', 'Back');
+%     app.BackButton.ButtonPushedFcn = @(~,~) prevCallback();
+%     app.BackButton.Layout.Row = 1;
+%     app.BackButton.Layout.Column = 1;
+% 
+%     % Create Forward Button (center-right)
+%     app.ForwardButton = uibutton(app.GridLayout2, 'push', 'Text', 'Forward');
+%     app.ForwardButton.ButtonPushedFcn = @(~,~) nextCallback();
+%     app.ForwardButton.Layout.Row = 1;
+%     app.ForwardButton.Layout.Column = 3;
+% 
+%     % Create "Select Region" Button (far right)
+%     app.SelectRegionButton = uibutton(app.GridLayout2, 'push', 'Text', 'Select Region');
+%     app.SelectRegionButton.ButtonPushedFcn = @(~,~) selectRegionCallback();
+%     app.SelectRegionButton.Layout.Row = 1;
+%     app.SelectRegionButton.Layout.Column = 5;
+% 
+%     % Initialize the current index tracker for setnames
+%     currentIndex = 1;
+% 
+%     % Function to update highlighted points
+%     function updateHighlight()
+%         mask = strcmp(GPSpoints{:,2}, setnames{currentIndex});
+%         highlightPlot.LatitudeData = GPSpoints.Latitude(mask);
+%         highlightPlot.LongitudeData = GPSpoints.Longitude(mask);
+%         app.GPS_desc_label.Text = setnames{currentIndex}; % Update text display
+%         updateImage(); % Update the image when the GPS set changes
+%     end
+% 
+%     % Function to update the image display
+%     function updateImage()
+%         % Get the image filename from FileIDX based on currentIndex
+%         mask = strcmp(GPSpoints{:,2}, setnames{currentIndex});
+%         imgfile = GPSpoints.FileIDX(mask);
+%         imgfile = imgfile(1);
+% 
+%         if strcmp(imgfile, "")
+%             % Do nothing for now
+%         else
+%             % Load the image and display it in the image axes
+%             img = imread(imgfile);
+%             imshow(img, 'Parent', app.UIAxes2);
+%         end
+%     end
+% 
+%     % Callback for Previous Button
+%     function prevCallback()
+%         if currentIndex > 1
+%             currentIndex = currentIndex - 1;
+%             updateHighlight();
+%         end
+%     end
+% 
+%     % Callback for Next Button
+%     function nextCallback()
+%         if currentIndex < NUM_IMGsets
+%             currentIndex = currentIndex + 1;
+%             updateHighlight();
+%         end
+%     end
+% 
+%     % Callback for "Ready to Select Region" Button
+%     function selectRegionCallback()
+%         % Prompt user to draw a polygon around the points visible to the camera
+%         f = msgbox("Draw a polygon around the points visible to the cam");
+%         uiwait(f);  % Wait for the message box to close
+% 
+%         % Allow user to draw a polygon
+%         roi = drawpolygon(app.UIAxes);
+% 
+%         % Check if a region was selected
+%         if size(roi.Position, 1) == 0
+%             disp("Failed to detect region of interest. Try again.");
+%         else
+%             % Get the GPS points inside the drawn polygon (region of interest)
+%             GPSmask = inROI(roi, GPSpoints.Latitude, GPSpoints.Longitude);
+%             disp("Region selected successfully.");
+%             % You can now use 'GPSmask' for further processing
+%         end
+%     end
+% 
+%     % Initial Highlight and Image Update
+%     updateHighlight();
+% end
 
 %% Img copier GUI
 

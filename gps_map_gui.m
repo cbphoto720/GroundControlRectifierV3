@@ -17,12 +17,12 @@ function gps_map_gui(UserPrefs, GPSpoints)
         'Position', [figX, figY, figWidth, figHeight]);
 
     % Create GridLayout for the main figure
-    app.GridLayout = uigridlayout(GPSplot);
-    app.GridLayout.RowHeight = {'4x', '1x'};
-    app.GridLayout.ColumnWidth = {'1x', '1x'};
+    app.MainGridLayout = uigridlayout(GPSplot);
+    app.MainGridLayout.RowHeight = {'4x', '1x'};
+    app.MainGridLayout.ColumnWidth = {'1x', '1x'};
 
     % Create UIAxes (left side for GPS map)
-    app.UIAxes = geoaxes(app.GridLayout);
+    app.UIAxes = geoaxes(app.MainGridLayout);
     app.UIAxes.Layout.Row = 1;
     app.UIAxes.Layout.Column = 1;
     hold(app.UIAxes, 'on'); % Allow multiple drawings
@@ -31,6 +31,13 @@ function gps_map_gui(UserPrefs, GPSpoints)
     % Get unique descriptions (setnames)
     setnames = getSetNames(GPSpoints);
     NUM_IMGsets = numel(setnames); % Get number of unique sets
+
+       % Initialize the current index tracker for setnames
+    currentIndex = 1;
+
+    app.isPickingGCP = false;  % Set state
+    app.GCPsetIDX=1; % IDX for individual GPS points within the set (for UV-picking)
+
 
     % Plot all GPS points
     geobasemap(app.UIAxes, "satellite");
@@ -45,69 +52,84 @@ function gps_map_gui(UserPrefs, GPSpoints)
     hold(app.UIAxes, 'off');
 
     % Create UIAxes2 (right side for image display)
-    app.IMGaxes = axes(app.GridLayout);
+    app.IMGaxes = axes(app.MainGridLayout);
     app.IMGaxes.Layout.Row = 1;
     app.IMGaxes.Layout.Column = 2;
 
     % Create GridLayout2 for buttons at the bottom of GPS axis
-    app.GridLayout2 = uigridlayout(app.GridLayout);
-    app.GridLayout2.Layout.Row = 2;
-    app.GridLayout2.Layout.Column = 1;
-    app.GridLayout2.ColumnWidth = {'0.5x', '0.5x', '0.5x', '1x', '0.75x'};
+    app.GPSButtonGrid = uigridlayout(app.MainGridLayout);
+    app.GPSButtonGrid.Layout.Row = 2;
+    app.GPSButtonGrid.Layout.Column = 1;
+    app.GPSButtonGrid.ColumnWidth = {'0.5x', '0.5x', '0.5x', '1x', '0.75x'};
 
     % Create Back Button (left side)
-    app.BackButton = uibutton(app.GridLayout2, 'push', 'Text', 'Back');
+    app.BackButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Back');
     app.BackButton.ButtonPushedFcn = @(~,~) prevCallback();
     app.BackButton.Layout.Row = 1;
     app.BackButton.Layout.Column = 1;
 
         % Create a description label for the current set
-    app.GPS_desc_label = uilabel(app.GridLayout2, 'Text', setnames{1}, ...
+    app.GPS_desc_label = uilabel(app.GPSButtonGrid, 'Text', setnames{1}, ...
         'FontSize', 14, 'HorizontalAlignment', 'center');
     app.ForwardButton.Layout.Row = 1;
     app.ForwardButton.Layout.Column = 2;
 
     % Create Forward Button (center-right)
-    app.ForwardButton = uibutton(app.GridLayout2, 'push', 'Text', 'Forward');
+    app.ForwardButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Forward');
     app.ForwardButton.ButtonPushedFcn = @(~,~) nextCallback();
     app.ForwardButton.Layout.Row = 1;
     app.ForwardButton.Layout.Column = 3;
 
     % Create "Select Region" Button (far right)
-    app.SelectRegionButton = uibutton(app.GridLayout2, 'push', 'Text', 'Select Region');
+    app.SelectRegionButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Select Region');
     app.SelectRegionButton.ButtonPushedFcn = @(~,~) selectRegionCallback();
     app.SelectRegionButton.Layout.Row = 1;
     app.SelectRegionButton.Layout.Column = 5;
 
-    % Create GridLayout3 for buttons at the bottom of the IMG plot
-    app.GridLayout3 = uigridlayout(app.GridLayout);
-    app.GridLayout3.Layout.Row = 2;
-    app.GridLayout3.Layout.Column = 2;
-    app.GridLayout3.ColumnWidth = {'1x','1x','1x','1x','1x','1x'};
+    % Create IMGButtonGrid for buttons at the bottom of the IMG plot
+    app.IMGButtonGrid = uigridlayout(app.MainGridLayout);
+    app.IMGButtonGrid.Layout.Row = 2;
+    app.IMGButtonGrid.Layout.Column = 2;
+    app.IMGButtonGrid.ColumnWidth = {'0.5x','0.5x','0.5x','2x','0.5x','1x','0.5x'};
 
-    % Create Zoom slider
-    app.ZoomSliderLabel = uilabel(app.GridLayout3);
-    app.ZoomSliderLabel.HorizontalAlignment = 'right';
-    app.ZoomSliderLabel.Layout.Row = 1;
-    app.ZoomSliderLabel.Layout.Column = 1;
-    app.ZoomSliderLabel.Text = 'Zoom';
-    app.Zoomslider=uislider(app.GridLayout3);
-    app.Zoomslider.Layout.Row = 1;
-    app.Zoomslider.Layout.Column = [2 3];
+    app.UITable = uitable(app.IMGButtonGrid);
+    app.UITable.Layout.Row = [1 2];
+    app.UITable.Layout.Column = [1 3];
+    app.UITable.Data = table(num2cell(GPSpoints.Name(mask)),num2cell(zeros(length(GPSpoints.Name(mask)),1)),num2cell(zeros(length(GPSpoints.Name(mask)),1)), ...
+        'VariableNames',{'PointNum','Image U', 'Image V'}); %FLAG ` make sure to update under updateHighlight as well!
+    % app.UITable.ColumnName = {'Name', 'X', 'Y'};
+    app.UITable.ColumnWidth={'1x','1x','1x'};
+    app.UITable.ColumnEditable = [false, false, false];  % Set this to false for all columns
 
-    % Zoom plot
-    app.ZoomIMG = axes(app.GridLayout3);
-    app.ZoomIMG.Layout.Row = [1 2];
-    app.ZoomIMG.Layout.Column = [4 6];
+    % Next GCP button
+    app.NextGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Prev GCP');
+    app.NextGCP.ButtonPushedFcn = @(~,~) prevGCPCallback();
+    app.NextGCP.Layout.Row = 2;
+    app.NextGCP.Layout.Column = 5;
+
+    % GCPsetIDX Label 
+    app.GCPlabel = uilabel(app.IMGButtonGrid, 'Text', string(app.GCPsetIDX), ...
+        'FontSize', 14, 'HorizontalAlignment', 'center');
+    app.GCPlabel.Layout.Row = 2;
+    app.GCPlabel.Layout.Column = 6;
+
+    % Prev GCP button
+    app.PrevGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Next GCP');
+    app.PrevGCP.ButtonPushedFcn = @(~,~) nextGCPCallback();
+    app.PrevGCP.Layout.Row = 2;
+    app.PrevGCP.Layout.Column = 7;
+
+    % Create Pick GCP button
+    app.PickGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Select GCP');
+    app.PickGCP.ButtonPushedFcn = @(~,~) UVpickcallback();
+    app.PickGCP.Layout.Row = 1;
+    app.PickGCP.Layout.Column = 6;
 
     % image U,V button
     % app.SelectRegionButton = uibutton(app.GridLayout3, 'state', 'Text', 'UV Pick');
     % app.SelectRegionButton.ButtonPushedFcn = @(~,~) UVpickcallback();
     % app.SelectRegionButton.Layout.Row = 1;
     % app.SelectRegionButton.Layout.Column = 5;
-
-     % Initialize the current index tracker for setnames
-    currentIndex = 1;
 
     % Function to update highlighted points
     function updateHighlight()
@@ -116,6 +138,17 @@ function gps_map_gui(UserPrefs, GPSpoints)
         highlightPlot.LongitudeData = GPSpoints.Longitude(mask);
         app.GPS_desc_label.Text = setnames{currentIndex}; % Update text display
         updateImage(); % Update the image when the GPS set changes
+
+        app.UITable.Data = table(num2cell(GPSpoints.Name(mask)),num2cell(zeros(length(GPSpoints.Name(mask)),1)),num2cell(zeros(length(GPSpoints.Name(mask)),1)), ...
+        'VariableNames',{'PointNum','Image U', 'Image V'}); %update table
+        % Color Table to represent highlighting
+        for coloridx=1:height(app.UITable.Data)
+            if coloridx==app.GCPsetIDX
+                addStyle(app.UITable,uistyle('BackgroundColor','#ebd05b'),'row',coloridx);
+            else
+                addStyle(app.UITable,uistyle('BackgroundColor','#FFFFFF'),'row',coloridx);
+            end
+        end
     end
 
     % Function to update the image display
@@ -126,13 +159,15 @@ function gps_map_gui(UserPrefs, GPSpoints)
         imgfile = imgfile(1);
         
         if strcmp(imgfile, "")
-            % Do nothing for now
+            % Do nothing for now (maybe add a NaN img)
         else
             % Load the image and display it in the image axes
-            img = imread(imgfile);
-            imshow(img, 'Parent', app.IMGaxes);
-             % Set the ButtonDownFcn callback for the axes
-            % app.IMGaxes.ButtonDownFcn = @(src, event) UVpickcallback(src, event, img);
+            app.img = imread(imgfile);
+            % imshow(img, 'Parent', app.IMGaxes);
+
+             % Set the ButtonDownFcn callback for the img
+            hImg = imshow(app.img, 'Parent', app.IMGaxes);
+            set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
         end
     end
 
@@ -148,6 +183,20 @@ function gps_map_gui(UserPrefs, GPSpoints)
     function nextCallback()
         if currentIndex < NUM_IMGsets
             currentIndex = currentIndex + 1;
+            updateHighlight();
+        end
+    end
+
+    function nextGCPCallback()
+        if app.GCPsetIDX < height(app.UITable.Data)
+            app.GCPsetIDX = app.GCPsetIDX+1;
+            updateHighlight();
+        end
+    end
+
+    function prevGCPCallback()
+        if app.GCPsetIDX > 1
+            app.GCPsetIDX = app.GCPsetIDX-1;
             updateHighlight();
         end
     end
@@ -172,22 +221,41 @@ function gps_map_gui(UserPrefs, GPSpoints)
         end
     end
 
-    function UVpickcallback()
-        % Get the pixel coordinates of the click
-        clickedPoint = event.IntersectionPoint;  % Get the coordinates [x, y]
-        
-        % Get the row and column indices (in image space)
-        x = round(clickedPoint(1));  % X coordinate (column)
-        y = round(clickedPoint(2));  % Y coordinate (row)
-        
-        % Check if the click is within the bounds of the image
-        if x >= 1 && x <= size(img, 2) && y >= 1 && y <= size(img, 1)
-            % Display the coordinates
-            disp(['Clicked at coordinates: (', num2str(x), ', ', num2str(y), ')']);
-        else
-            disp('Clicked outside of image bounds.');
+    function UVpickcallback
+        app.isPickingGCP = ~app.isPickingGCP;  % Set state
+        if app.isPickingGCP % Button pressed
+            app.PickGCP.BackgroundColor = [0 1 0];  % Green
+        else % Button de-pressed
+            app.PickGCP.BackgroundColor = [0.94, 0.94, 0.94];  % default uifigure gray 
         end
     end
+
+    function IMGclickCallback(src, event)     
+        % Normal click behavior when not in pan mode
+        if app.isPickingGCP
+            clickedPoint = event.IntersectionPoint;
+            x = round(clickedPoint(1));
+            y = round(clickedPoint(2));
+            disp(['Clicked at (', num2str(x), ', ', num2str(y), ')']);
+        end
+    end
+
+    % Define the callback function
+    % function captureSelectedCell(src, event)
+    %     % Get the selected row and column indices
+    %     selectedRow = event.Indices(1);  % Row of the selected cell
+    %     selectedColumn = event.Indices(2);  % Column of the selected cell
+    % 
+    %     % Get the data of the selected cell
+    %     selectedData = src.Data{selectedRow, selectedColumn};  % Data in the selected cell
+    % 
+    %     s = uistyle('BackgroundColor','#ebd05b'); % way to highlight current row
+    %     addStyle(app.UITable,s,'row',selectedRow);
+    % 
+    %     % Display the selected row, column, and data in the command window
+    %     disp(['Selected cell: Row ', string(selectedRow), ', Column ', num2str(selectedColumn)]);
+    %     disp(['Selected data: ', string(selectedData)]);
+    % end
 
     % Initial Highlight and Image Update
     updateHighlight();

@@ -33,11 +33,14 @@ function gps_map_gui(UserPrefs, GPSpoints)
     NUM_IMGsets = numel(setnames); % Get number of unique sets
 
        % Initialize the current index tracker for setnames
-    currentIndex = 1;
+    setIDX = 1;
 
     app.isPickingGCP = false;  % Set state
-    app.GCPsetIDX=1; % IDX for individual GPS points within the set (for UV-picking)
+    app.gcpIDX=1; % IDX for individual GPS points within the set (for UV-picking)
 
+    app.gcpHighlightMarker = [];  % Holds handles to GCP scatter plot on IMGaxes
+    app.gcpPrevMarker = table([], [], [], [], ...
+    'VariableNames', {'PointNum', 'X', 'Y', 'Handle'});
 
     % Plot all GPS points
     geobasemap(app.UIAxes, "satellite");
@@ -48,7 +51,8 @@ function gps_map_gui(UserPrefs, GPSpoints)
     end
 
     % Overlay for highlighted points
-    highlightPlot = geoscatter(app.UIAxes, NaN, NaN, 100, 'r', 'pentagram','filled'); % Initially empty
+    highlightSETPlot = geoscatter(app.UIAxes, NaN, NaN, 100, 'r', 'pentagram','filled'); % Initially empty
+    highlightSINGLEPlot = geoscatter(app.UIAxes, NaN, NaN, 100,'pentagram','filled', 'MarkerFaceColor', '#f024d1'); % Initially empty
     hold(app.UIAxes, 'off');
 
     % Create UIAxes2 (right side for image display)
@@ -63,8 +67,8 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.GPSButtonGrid.ColumnWidth = {'0.5x', '0.5x', '0.5x', '1x', '0.75x'};
 
     % Create Back Button (left side)
-    app.BackButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Back');
-    app.BackButton.ButtonPushedFcn = @(~,~) prevCallback();
+    app.BackButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Prev set');
+    app.BackButton.ButtonPushedFcn = @(~,~) prevSETCallback();
     app.BackButton.Layout.Row = 1;
     app.BackButton.Layout.Column = 1;
 
@@ -75,8 +79,8 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.ForwardButton.Layout.Column = 2;
 
     % Create Forward Button (center-right)
-    app.ForwardButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Forward');
-    app.ForwardButton.ButtonPushedFcn = @(~,~) nextCallback();
+    app.ForwardButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Next set');
+    app.ForwardButton.ButtonPushedFcn = @(~,~) nextSETCallback();
     app.ForwardButton.Layout.Row = 1;
     app.ForwardButton.Layout.Column = 3;
 
@@ -90,7 +94,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.IMGButtonGrid = uigridlayout(app.MainGridLayout);
     app.IMGButtonGrid.Layout.Row = 2;
     app.IMGButtonGrid.Layout.Column = 2;
-    app.IMGButtonGrid.ColumnWidth = {'0.5x','0.5x','0.5x','2x','0.5x','1x','0.5x'};
+    app.IMGButtonGrid.ColumnWidth = {'0.5x','0.5x','0.5x','0.1x','0.5x','0.5x','0.5x'};
 
     app.UITable = uitable(app.IMGButtonGrid);
     app.UITable.Layout.Row = [1 2];
@@ -108,7 +112,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.NextGCP.Layout.Column = 5;
 
     % GCPsetIDX Label 
-    app.GCPlabel = uilabel(app.IMGButtonGrid, 'Text', string(app.GCPsetIDX), ...
+    app.GCPlabel = uilabel(app.IMGButtonGrid, 'Text', string(app.UITable.Data.PointNum(app.gcpIDX)), ...
         'FontSize', 14, 'HorizontalAlignment', 'center');
     app.GCPlabel.Layout.Row = 2;
     app.GCPlabel.Layout.Column = 6;
@@ -120,41 +124,43 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.PrevGCP.Layout.Column = 7;
 
     % Create Pick GCP button
-    app.PickGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Select GCP');
-    app.PickGCP.ButtonPushedFcn = @(~,~) UVpickcallback();
+    app.PickGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Pick GCP');
+    app.PickGCP.ButtonPushedFcn = @(~,~) PickGCPcallback();
     app.PickGCP.Layout.Row = 1;
-    app.PickGCP.Layout.Column = 6;
+    app.PickGCP.Layout.Column = 7;
 
-    % image U,V button
-    % app.SelectRegionButton = uibutton(app.GridLayout3, 'state', 'Text', 'UV Pick');
-    % app.SelectRegionButton.ButtonPushedFcn = @(~,~) UVpickcallback();
-    % app.SelectRegionButton.Layout.Row = 1;
-    % app.SelectRegionButton.Layout.Column = 5;
+    % Create Delete GCP button
+    app.DeleteGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Delete GCP');
+    app.DeleteGCP.ButtonPushedFcn = @(~,~) DeleteGCPcallback();
+    app.DeleteGCP.Layout.Row = 1;
+    app.DeleteGCP.Layout.Column = 6;
 
     % Function to update highlighted points
-    function updateHighlight()
-        mask = strcmp(GPSpoints{:,2}, setnames{currentIndex});
-        highlightPlot.LatitudeData = GPSpoints.Latitude(mask);
-        highlightPlot.LongitudeData = GPSpoints.Longitude(mask);
-        app.GPS_desc_label.Text = setnames{currentIndex}; % Update text display
-        updateImage(); % Update the image when the GPS set changes
+    function updateFullFrame()
+        updatePoints();
+        updateTable();
+        updateImage();
+    end
 
-        app.UITable.Data = table(num2cell(GPSpoints.Name(mask)),num2cell(zeros(length(GPSpoints.Name(mask)),1)),num2cell(zeros(length(GPSpoints.Name(mask)),1)), ...
-        'VariableNames',{'PointNum','Image U', 'Image V'}); %update table
-        % Color Table to represent highlighting
-        for coloridx=1:height(app.UITable.Data)
-            if coloridx==app.GCPsetIDX
-                addStyle(app.UITable,uistyle('BackgroundColor','#ebd05b'),'row',coloridx);
-            else
-                addStyle(app.UITable,uistyle('BackgroundColor','#FFFFFF'),'row',coloridx);
-            end
-        end
+    function updatePoints()
+        mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
+
+        % Update set highlight
+        highlightSETPlot.LatitudeData = GPSpoints.Latitude(mask);
+        highlightSETPlot.LongitudeData = GPSpoints.Longitude(mask);
+
+        % Update single point highlight
+        highlightSINGLEPlot.LatitudeData = highlightSETPlot.LatitudeData(app.gcpIDX);
+        highlightSINGLEPlot.LongitudeData = highlightSETPlot.LongitudeData(app.gcpIDX);
+        % highlightSINGLEPlot.Color='#f024d1';
+
+        app.GPS_desc_label.Text = setnames{setIDX}; % Update text display
     end
 
     % Function to update the image display
     function updateImage()
-        % Get the image filename from FileIDX based on currentIndex
-        mask = strcmp(GPSpoints{:,2}, setnames{currentIndex});
+        % Get the image filename from FileIDX based on setIDX
+        mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
         imgfile = GPSpoints.FileIDX(mask);
         imgfile = imgfile(1);
         
@@ -163,41 +169,91 @@ function gps_map_gui(UserPrefs, GPSpoints)
         else
             % Load the image and display it in the image axes
             app.img = imread(imgfile);
-            % imshow(img, 'Parent', app.IMGaxes);
-
-             % Set the ButtonDownFcn callback for the img
             hImg = imshow(app.img, 'Parent', app.IMGaxes);
             set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
+
+            updateImageOverlay()
         end
     end
 
+    function updateImageOverlay()
+        delete(findall(app.IMGaxes, 'Tag', 'GCPscatter'));
+
+        % Calc what point to highlight
+        Pointnum=app.UITable.Data.PointNum(app.gcpIDX);
+        Pointnum=Pointnum{1};
+        if any(app.gcpPrevMarker.PointNum==Pointnum)
+            HighlightTarget= app.gcpPrevMarker(find(app.gcpPrevMarker.PointNum ==Pointnum),:);
+            app.gcpHighlightMarker = struct('PointNum', HighlightTarget.PointNum,'X', HighlightTarget.X, 'Y', HighlightTarget.Y, 'Handle', HighlightTarget.Handle);
+        else
+            app.gcpHighlightMarker = struct('PointNum', Pointnum,'X', NaN, 'Y', NaN, 'Handle', NaN);
+        end
+        
+        hold(app.IMGaxes, 'on'); % add overlays
+            % add GCP UV coordinates 
+            if ~isempty(app.gcpPrevMarker)
+                for prevGCPUV = 1:height(app.gcpPrevMarker)
+                    scatter(app.IMGaxes, app.gcpPrevMarker.X(prevGCPUV), app.gcpPrevMarker.Y(prevGCPUV), ...
+                        10, [35, 42, 235]/255, 'filled', 'o', 'Tag', 'GCPscatter'); % Pink color
+                end
+            end
+            if ~isempty(app.gcpHighlightMarker)
+                scatter(app.IMGaxes, app.gcpHighlightMarker.X, app.gcpHighlightMarker.Y, ...
+                    10, [240/255, 36/255, 209/255], 'filled', 'o', 'Tag', 'GCPscatter'); % Blue color
+            end
+            hold(app.IMGaxes, 'off');
+    end
+
+
+    function updateTable()
+        app.UITable.Data = table(num2cell(GPSpoints.Name(mask)),num2cell(zeros(length(GPSpoints.Name(mask)),1)),num2cell(zeros(length(GPSpoints.Name(mask)),1)), ...
+        'VariableNames',{'PointNum','Image U', 'Image V'}); %update table data
+
+        app.GCPlabel.Text=string(app.UITable.Data.PointNum(app.gcpIDX)); %update table label
+        
+         % Color Table to represent Which GCP we are editing
+        for coloridx=1:height(app.UITable.Data)
+            if coloridx==app.gcpIDX
+                addStyle(app.UITable,uistyle('BackgroundColor','#f024d1'),'row',coloridx);
+            else
+                addStyle(app.UITable,uistyle('BackgroundColor','#FFFFFF'),'row',coloridx);
+            end
+        end
+
+        updatePoints();
+    end
+
     % Callback for Previous Button
-    function prevCallback()
-        if currentIndex > 1
-            currentIndex = currentIndex - 1;
-            updateHighlight();
+    function prevSETCallback()
+        if setIDX > 1
+            setIDX = setIDX - 1;
+            app.gcpIDX=1;
+            updateFullFrame();
         end
     end
 
     % Callback for Next Button
-    function nextCallback()
-        if currentIndex < NUM_IMGsets
-            currentIndex = currentIndex + 1;
-            updateHighlight();
+    function nextSETCallback()
+        if setIDX < NUM_IMGsets
+            setIDX = setIDX + 1;
+            app.gcpIDX=1;
+            updateFullFrame();
         end
     end
 
     function nextGCPCallback()
-        if app.GCPsetIDX < height(app.UITable.Data)
-            app.GCPsetIDX = app.GCPsetIDX+1;
-            updateHighlight();
+        if app.gcpIDX < height(app.UITable.Data)
+            app.gcpIDX = app.gcpIDX+1;
+            updateTable();
+            updateImageOverlay();
         end
     end
 
     function prevGCPCallback()
-        if app.GCPsetIDX > 1
-            app.GCPsetIDX = app.GCPsetIDX-1;
-            updateHighlight();
+        if app.gcpIDX > 1
+            app.gcpIDX = app.gcpIDX-1;
+            updateTable();
+            updateImageOverlay();
         end
     end
 
@@ -221,13 +277,17 @@ function gps_map_gui(UserPrefs, GPSpoints)
         end
     end
 
-    function UVpickcallback
+    function PickGCPcallback
         app.isPickingGCP = ~app.isPickingGCP;  % Set state
         if app.isPickingGCP % Button pressed
-            app.PickGCP.BackgroundColor = [0 1 0];  % Green
+            app.PickGCP.BackgroundColor = '#f024d1';
         else % Button de-pressed
             app.PickGCP.BackgroundColor = [0.94, 0.94, 0.94];  % default uifigure gray 
         end
+    end
+
+    function DeleteGCPcallback()
+        
     end
 
     function IMGclickCallback(src, event)     
@@ -237,26 +297,51 @@ function gps_map_gui(UserPrefs, GPSpoints)
             x = round(clickedPoint(1));
             y = round(clickedPoint(2));
             disp(['Clicked at (', num2str(x), ', ', num2str(y), ')']);
+
+            % Plot a marker at the clicked point
+            hold(app.IMGaxes, 'on');
+            scatterHandle = scatter(app.IMGaxes, x, y, 10, [240/255, 36/255, 209/255], 'filled', 'o'); %blue
+            % scatterHandle = scatter(app.IMGaxes, x, y, 10, [240/255, 36/255, 209/255], 'filled', 'o');
+            scatterHandle.Visible = 'off';  % Hide it right away
+            hold(app.IMGaxes, 'off');
+    
+            % Store the marker info so it persists
+            Pointnum=app.UITable.Data.PointNum(app.gcpIDX);
+            Pointnum=Pointnum{1};
+            newRow = table(Pointnum, x, y, scatterHandle, ...
+               'VariableNames', {'PointNum', 'X', 'Y', 'Handle'});
+            if any(app.gcpPrevMarker.PointNum==Pointnum)
+                app.gcpPrevMarker(find(app.gcpPrevMarker.PointNum ==Pointnum),:)=newRow;
+            else
+                app.gcpPrevMarker(end+1,:) = newRow;
+            end
+
+            updateImageOverlay()
+            % nextGCPCallback();
         end
     end
-
-    % Define the callback function
-    % function captureSelectedCell(src, event)
-    %     % Get the selected row and column indices
-    %     selectedRow = event.Indices(1);  % Row of the selected cell
-    %     selectedColumn = event.Indices(2);  % Column of the selected cell
+    
+    % function IMGclickCallback(src, event)
+    %     if app.isPickingGCP
+    %         clickedPoint = event.IntersectionPoint;
+    %         x = round(clickedPoint(1));
+    %         y = round(clickedPoint(2));
+    %         disp(['Clicked at (', num2str(x), ', ', num2str(y), ')']);
     % 
-    %     % Get the data of the selected cell
-    %     selectedData = src.Data{selectedRow, selectedColumn};  % Data in the selected cell
+    %         % Plot a pink marker at the clicked point
+    %         hold(app.IMGaxes, 'on');
+    %         scatterHandle = scatter(app.IMGaxes, x, y, 100, [240/255, 36/255, 0.7059], 'filled', 'o');
+    %         hold(app.IMGaxes, 'off');
     % 
-    %     s = uistyle('BackgroundColor','#ebd05b'); % way to highlight current row
-    %     addStyle(app.UITable,s,'row',selectedRow);
-    % 
-    %     % Display the selected row, column, and data in the command window
-    %     disp(['Selected cell: Row ', string(selectedRow), ', Column ', num2str(selectedColumn)]);
-    %     disp(['Selected data: ', string(selectedData)]);
+    %         % Store the marker info so it persists
+    %         app.gcpMarkers{end+1} = struct('X', x, 'Y', y, 'Handle', scatterHandle);
+    %     end
     % end
 
     % Initial Highlight and Image Update
-    updateHighlight();
+    updateFullFrame();
 end
+
+%% Scatch paper
+
+% scatterHandle = scatter(app.IMGaxes, x, y, 100, [240/255, 36/255, 0.7059], 'filled', 'o');

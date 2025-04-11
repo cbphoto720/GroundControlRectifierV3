@@ -169,7 +169,7 @@ gps_map_gui(UserPrefs,GPSpoints);
 
 %%
 % for fileIDX=1:length(filenames)
-    pickGCPsGUI(files(1).name); %WIP pass in filenames and loop through
+    % pickGCPsGUI(files(1).name); %WIP pass in filenames and loop through
 % end
 
 %%

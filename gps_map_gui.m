@@ -13,11 +13,11 @@ function gps_map_gui(UserPrefs, GPSpoints)
     figY = (scr_siz(4) - figHeight) / 2; % Center vertically
 
     % Create main UI figure
-    GPSplot = uifigure('Name', 'GPS Map Viewer', ...
+    GCPapp = uifigure('Name', 'Ground Control Picker', ...
         'Position', [figX, figY, figWidth, figHeight]);
 
     % Create GridLayout for the main figure
-    app.MainGridLayout = uigridlayout(GPSplot);
+    app.MainGridLayout = uigridlayout(GCPapp);
     app.MainGridLayout.RowHeight = {'4x', '1x'};
     app.MainGridLayout.ColumnWidth = {'1x', '1x'};
 
@@ -56,8 +56,16 @@ function gps_map_gui(UserPrefs, GPSpoints)
     end
 
     % Overlay for highlighted points
+    highlightSAVEDGCPPlot = geoscatter(app.UIAxes, NaN, NaN, 100,'pentagram','filled', 'MarkerFaceColor', '#000000'); % Initially empty
     highlightSETPlot = geoscatter(app.UIAxes, NaN, NaN, 100, 'r', 'pentagram','filled'); % Initially empty
     highlightSINGLEPlot = geoscatter(app.UIAxes, NaN, NaN, 100,'pentagram','filled', 'MarkerFaceColor', '#f024d1'); % Initially empty
+
+    % Add Legend
+    legend(app.UIAxes, ...
+    [highlightSAVEDGCPPlot, highlightSETPlot, highlightSINGLEPlot], ...
+    {'Saved GCP', 'Set Highlight', 'User Selection'}, ...
+    'Location', 'northeast');
+
     hold(app.UIAxes, 'off');
 
     %% GUI Elements
@@ -90,12 +98,6 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.ForwardButton.ButtonPushedFcn = @(~,~) nextSETCallback();
     app.ForwardButton.Layout.Row = 1;
     app.ForwardButton.Layout.Column = 4;
-
-    % % Create "Select Region" Button (far right)
-    % app.SelectRegionButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Select Region');
-    % app.SelectRegionButton.ButtonPushedFcn = @(~,~) selectRegionCallback();
-    % app.SelectRegionButton.Layout.Row = 1;
-    % app.SelectRegionButton.Layout.Column = 5;
 
     % Create IMGButtonGrid for buttons at the bottom of the IMG plot
     app.IMGButtonGrid = uigridlayout(app.MainGridLayout);
@@ -152,6 +154,10 @@ function gps_map_gui(UserPrefs, GPSpoints)
     function updatePoints()
         mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
 
+        % Update color for all saved GCPs
+        highlightSAVEDGCPPlot.LatitudeData = GPSpoints.Latitude(GPSpoints.ImageU~=0);
+        highlightSAVEDGCPPlot.LongitudeData = GPSpoints.Longitude(GPSpoints.ImageU~=0);
+
         % Update set highlight
         highlightSETPlot.LatitudeData = GPSpoints.Latitude(mask);
         highlightSETPlot.LongitudeData = GPSpoints.Longitude(mask);
@@ -159,7 +165,6 @@ function gps_map_gui(UserPrefs, GPSpoints)
         % Update single point highlight
         highlightSINGLEPlot.LatitudeData = highlightSETPlot.LatitudeData(app.gcpIDX);
         highlightSINGLEPlot.LongitudeData = highlightSETPlot.LongitudeData(app.gcpIDX);
-        % highlightSINGLEPlot.Color='#f024d1';
 
         app.GPS_desc_label.Text = setnames{setIDX}; % Update text display
     end
@@ -265,26 +270,6 @@ function gps_map_gui(UserPrefs, GPSpoints)
         end
     end
 
-    % Callback for "Ready to Select Region" Button
-    function selectRegionCallback()
-        % Prompt user to draw a polygon around the points visible to the camera
-        f = msgbox("Draw a polygon around the points visible to the cam");
-        uiwait(f);  % Wait for the message box to close
-        
-        % Allow user to draw a polygon
-        roi = drawpolygon(app.UIAxes);
-        
-        % Check if a region was selected
-        if size(roi.Position, 1) == 0
-            disp("Failed to detect region of interest. Try again.");
-        else
-            % Get the GPS points inside the drawn polygon (region of interest)
-            GPSmask = inROI(roi, GPSpoints.Latitude, GPSpoints.Longitude);
-            disp("Region selected successfully.");
-            % You can now use 'GPSmask' for further processing
-        end
-    end
-
     function PickGCPcallback
         app.isPickingGCP = ~app.isPickingGCP;  % Set state
         if app.isPickingGCP % Button pressed
@@ -355,23 +340,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
         end
     end
     
-    % function IMGclickCallback(src, event)
-    %     if app.isPickingGCP
-    %         clickedPoint = event.IntersectionPoint;
-    %         x = round(clickedPoint(1));
-    %         y = round(clickedPoint(2));
-    %         disp(['Clicked at (', num2str(x), ', ', num2str(y), ')']);
-    % 
-    %         % Plot a pink marker at the clicked point
-    %         hold(app.IMGaxes, 'on');
-    %         scatterHandle = scatter(app.IMGaxes, x, y, 100, [240/255, 36/255, 0.7059], 'filled', 'o');
-    %         hold(app.IMGaxes, 'off');
-    % 
-    %         % Store the marker info so it persists
-    %         app.gcpMarkers{end+1} = struct('X', x, 'Y', y, 'Handle', scatterHandle);
-    %     end
-    % end
-
+    pause(2); % pause to help elements load before trying to update the frame
     % Initial Highlight and Image Update
     updateFullFrame();
 end

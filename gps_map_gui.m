@@ -75,31 +75,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.IMGaxes.Layout.Row = 1;
     app.IMGaxes.Layout.Column = 2;
 
-    % Create GridLayout2 for buttons at the bottom of GPS axis
-    app.GPSButtonGrid = uigridlayout(app.MainGridLayout);
-    app.GPSButtonGrid.Layout.Row = 2;
-    app.GPSButtonGrid.Layout.Column = 1;
-    app.GPSButtonGrid.ColumnWidth = {'1x', '1x', '1x', '1x', '1x'};
-
-    % Create Back Button
-    app.BackButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Prev set');
-    app.BackButton.ButtonPushedFcn = @(~,~) prevSETCallback();
-    app.BackButton.Layout.Row = 1;
-    app.BackButton.Layout.Column = 2;
-
-        % Create a description label for the current set
-    app.GPS_desc_label = uilabel(app.GPSButtonGrid, 'Text', setnames{1}, ...
-        'FontSize', 14, 'HorizontalAlignment', 'center');
-    app.GPS_desc_label.Layout.Row = 1;
-    app.GPS_desc_label.Layout.Column = 3;
-
-    % Create Forward Button
-    app.ForwardButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Next set');
-    app.ForwardButton.ButtonPushedFcn = @(~,~) nextSETCallback();
-    app.ForwardButton.Layout.Row = 1;
-    app.ForwardButton.Layout.Column = 4;
-
-    % Create IMGButtonGrid for buttons at the bottom of the IMG plot
+     % Create IMGButtonGrid for buttons at the bottom of the IMG plot
     app.IMGButtonGrid = uigridlayout(app.MainGridLayout);
     app.IMGButtonGrid.Layout.Row = 2;
     app.IMGButtonGrid.Layout.Column = 2;
@@ -114,24 +90,6 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.UITable.ColumnWidth={'1x','1x','1x'};
     app.UITable.ColumnEditable = [false, false, false];  % Set this to false for all columns
 
-    % Next GCP button
-    app.PrevGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Prev GCP');
-    app.PrevGCP.ButtonPushedFcn = @(~,~) prevGCPCallback();
-    app.PrevGCP.Layout.Row = 2;
-    app.PrevGCP.Layout.Column = 5;
-
-    % GCPsetIDX Label 
-    app.GCPlabel = uilabel(app.IMGButtonGrid, 'Text', string(app.UITable.Data.PointNum(app.gcpIDX)), ...
-        'FontSize', 14, 'HorizontalAlignment', 'center');
-    app.GCPlabel.Layout.Row = 2;
-    app.GCPlabel.Layout.Column = 6;
-
-    % Prev GCP button
-    app.NextGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Next GCP');
-    app.NextGCP.ButtonPushedFcn = @(~,~) nextGCPCallback();
-    app.NextGCP.Layout.Row = 2;
-    app.NextGCP.Layout.Column = 7;
-
     % Create Pick GCP button
     app.PickGCP = uibutton(app.IMGButtonGrid, 'push', 'Text', 'Pick GCP');
     app.PickGCP.ButtonPushedFcn = @(~,~) PickGCPcallback();
@@ -143,6 +101,67 @@ function gps_map_gui(UserPrefs, GPSpoints)
     app.DeleteGCP.ButtonPushedFcn = @(~,~) DeleteGCPcallback();
     app.DeleteGCP.Layout.Row = 1;
     app.DeleteGCP.Layout.Column = 6;
+
+    % Create GridLayout2 for buttons at the bottom of GPS axis
+    app.GPSButtonGrid = uigridlayout(app.MainGridLayout);
+    app.GPSButtonGrid.Layout.Row = 2;
+    app.GPSButtonGrid.Layout.Column = 1;
+    app.GPSButtonGrid.ColumnWidth = {'1x', '1x', '1x', '0.5x', '1x','0.5x'};
+    app.GPSButtonGrid.RowHeight = {'1x', '1x'};
+
+    % Create Export Button
+    app.ExportButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Export points');
+    app.ExportButton.ButtonPushedFcn = @(~,~) ExportCallback();
+    app.ExportButton.Layout.Row = 2;
+    app.ExportButton.Layout.Column = 1;
+
+    % Create Save Button
+    app.SaveButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Save Progress');
+    app.SaveButton.ButtonPushedFcn = @(~,~) saveCallback();
+    app.SaveButton.Layout.Row = 2;
+    app.SaveButton.Layout.Column = 2;
+
+    % Create Import Button
+    app.ImportButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Import points');
+    app.ImportButton.ButtonPushedFcn = @(~,~) ImportCallback();
+    app.ImportButton.Layout.Row = 1;
+    app.ImportButton.Layout.Column = 1;
+
+    % Create Back Button
+    app.BackButton = uibutton(app.GPSButtonGrid, 'push', 'Text', '<< Prev set');
+    app.BackButton.ButtonPushedFcn = @(~,~) prevSETCallback();
+    app.BackButton.Layout.Row = 1;
+    app.BackButton.Layout.Column = 3;
+
+    % Create a description label for the current set
+    app.GPS_desc_label = uilabel(app.GPSButtonGrid, 'Text', setnames{1}, ...
+        'FontSize', 14, 'HorizontalAlignment', 'center');
+    app.GPS_desc_label.Layout.Row = 1;
+    app.GPS_desc_label.Layout.Column = 4;
+
+    % Create Forward Button
+    app.ForwardButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Next set >>');
+    app.ForwardButton.ButtonPushedFcn = @(~,~) nextSETCallback();
+    app.ForwardButton.Layout.Row = 1;
+    app.ForwardButton.Layout.Column = 5;
+
+    % Prev GCP button
+    app.PrevGCP = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Up');
+    app.PrevGCP.ButtonPushedFcn = @(~,~) prevGCPCallback();
+    app.PrevGCP.Layout.Row = 1;
+    app.PrevGCP.Layout.Column = 6;
+
+    % % GCPsetIDX Label 
+    % app.GCPlabel = uilabel(app.GPSButtonGrid, 'Text', string(app.UITable.Data.PointNum(app.gcpIDX)), ...
+    %     'FontSize', 14, 'HorizontalAlignment', 'center');
+    % app.GCPlabel.Layout.Row = 2;
+    % app.GCPlabel.Layout.Column = 6;
+
+    % Next GCP button
+    app.NextGCP = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Down');
+    app.NextGCP.ButtonPushedFcn = @(~,~) nextGCPCallback();
+    app.NextGCP.Layout.Row = 2;
+    app.NextGCP.Layout.Column = 6;
 
     % Function to update highlighted points
     function updateFullFrame()
@@ -236,6 +255,26 @@ function gps_map_gui(UserPrefs, GPSpoints)
         updatePoints();
     end
 
+    function ExportCallback();
+        outputmask=(GPSpoints.ImageU~=0);
+        outtable=[GPSpoints.Northings(outputmask),GPSpoints.Eastings(outputmask),GPSpoints.H(outputmask),...
+            GPSpoints.ImageU(outputmask),GPSpoints.ImageV(outputmask)];
+
+        % Print data to console
+        for i=1:length(outtable)
+            fprintf('- [%.6f, %.6f, %.6f, %d, %d]\n',outtable(i,1),outtable(i,2),outtable(i,3),outtable(i,4),outtable(i,5));
+        end
+
+    end
+
+    function saveCallback();
+        save("GroundControlPickerSaveState","GPSpoints") %WIP - Save file should be to outputfolder path in user prefs.
+    end
+
+    function ImportCallback();
+
+    end
+
     % Callback for Previous Button
     function prevSETCallback()
         if setIDX > 1
@@ -306,7 +345,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
             clickedPoint = event.IntersectionPoint;
             x = round(clickedPoint(1));
             y = round(clickedPoint(2));
-            disp(['Clicked at (', num2str(x), ', ', num2str(y), ')']);
+            % disp(['Clicked at (', num2str(x), ', ', num2str(y), ')']); %DEBUG
 
             % Plot a marker at the clicked point
             hold(app.IMGaxes, 'on');

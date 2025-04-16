@@ -16,6 +16,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
     % Create main UI figure
     GCPapp = uifigure('Name', 'Ground Control Picker', ...
         'Position', [figX, figY, figWidth, figHeight]);
+    GCPapp.CloseRequestFcn = @CloseRequest
 
     % Create GridLayout for the main figure
     app.MainGridLayout = uigridlayout(GCPapp);
@@ -398,6 +399,23 @@ function gps_map_gui(UserPrefs, GPSpoints)
             updateImageOverlay();
             updateTable();
         end
+    end
+
+    function CloseRequest(src, event)
+        fig = uifigure;
+        msg = "Do you want to save your current progress before closing?";
+        title = "Save Progress";
+        selection=uiconfirm(fig,msg,title, ...
+            "Options",{'Save','Do not save'}, ...
+            "DefaultOption",1);
+        switch selection
+            case 'Save'
+                saveCallback()
+            case 'Do not save'
+                close(fig);
+        end
+
+        delete(src)
     end
     
     pause(2); % pause to help elements load before trying to update the frame

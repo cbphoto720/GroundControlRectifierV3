@@ -411,6 +411,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
         switch selection
             case 'Save'
                 saveCallback()
+                close(fig);
             case 'Do not save'
                 close(fig);
         end

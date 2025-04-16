@@ -1,6 +1,7 @@
 function gps_map_gui(UserPrefs, GPSpoints)
     % Load Colormap
     load("hawaiiS.txt"); % Load color map
+    savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat("GCPSaveState_",num2str(UserPrefs.CamSN),".mat"));
 
     % Get screen size for positioning the figure
     set(0, 'units', 'pixels');
@@ -32,6 +33,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
 
     GPSpoints.ImageU=zeros(height(GPSpoints),1);
     GPSpoints.ImageV=zeros(height(GPSpoints),1);
+    % GPSpoints.scatterHandle=gobjects(height(GPSpoints), 1);
 
     % Get unique descriptions (setnames)
     setnames = getSetNames(GPSpoints);
@@ -214,26 +216,21 @@ function gps_map_gui(UserPrefs, GPSpoints)
         % Calc what point to highlight
         Pointnum=app.UITable.Data.PointNum(app.gcpIDX);
         Pointnum=Pointnum{1};
-        if any(app.gcpPrevMarker.PointNum==Pointnum)
-            HighlightTarget= app.gcpPrevMarker(find(app.gcpPrevMarker.PointNum ==Pointnum),:);
-            app.gcpHighlightMarker = struct('PointNum', HighlightTarget.PointNum,'X', HighlightTarget.X, 'Y', HighlightTarget.Y, 'Handle', HighlightTarget.Handle);
-        else
-            app.gcpHighlightMarker = struct('PointNum', Pointnum,'X', NaN, 'Y', NaN, 'Handle', NaN);
+
+        hold(app.IMGaxes, 'on'); % add overlays
+
+        % only plot points that aren't at 0,0
+        GPSpoints_GCPplot=GPSpoints(GPSpoints.ImageU~=0,:);
+        for i=1:height(GPSpoints_GCPplot)
+            scatter(app.IMGaxes, GPSpoints_GCPplot.ImageU(i), GPSpoints_GCPplot.ImageV(i), ...
+                    10, [66, 245, 99]/255, 'filled', 'o', 'Tag', 'GCPscatter'); % Green color
         end
         
-        hold(app.IMGaxes, 'on'); % add overlays
-            % add GCP UV coordinates 
-            if ~isempty(app.gcpPrevMarker)
-                for prevGCPUV = 1:height(app.gcpPrevMarker)
-                    scatter(app.IMGaxes, app.gcpPrevMarker.X(prevGCPUV), app.gcpPrevMarker.Y(prevGCPUV), ...
-                        10, [66, 245, 99]/255, 'filled', 'o', 'Tag', 'GCPscatter'); % Green color
-                end
-            end
-            if ~isempty(app.gcpHighlightMarker)
-                scatter(app.IMGaxes, app.gcpHighlightMarker.X, app.gcpHighlightMarker.Y, ...
-                    10, [240, 36, 209]/255, 'filled', 'o', 'Tag', 'GCPscatter'); % Pink color
-            end
-            hold(app.IMGaxes, 'off');
+        % plot the highlighted point in pink (even if the coords are 0,0
+        scatter(app.IMGaxes,GPSpoints.ImageU(Pointnum), GPSpoints.ImageV(Pointnum), ...
+            10, [240, 36, 209]/255, 'filled', 'o', 'Tag', 'GCPscatter'); % Pink color
+
+        hold(app.IMGaxes, 'off');
     end
 
 
@@ -255,6 +252,12 @@ function gps_map_gui(UserPrefs, GPSpoints)
         updatePoints();
     end
 
+    function redrawGCPS()
+        for i=1:height(GPSpoints(GPSpoints.ImageU~=0,:))
+            
+        end
+    end
+
     function ExportCallback();
         outputmask=(GPSpoints.ImageU~=0);
         outtable=[GPSpoints.Northings(outputmask),GPSpoints.Eastings(outputmask),GPSpoints.H(outputmask),...
@@ -267,12 +270,56 @@ function gps_map_gui(UserPrefs, GPSpoints)
 
     end
 
-    function saveCallback();
-        save("GroundControlPickerSaveState","GPSpoints") %WIP - Save file should be to outputfolder path in user prefs.
+    function saveCallback()
+        save(savefilename,"GPSpoints","UserPrefs") %WIP - Save file should be to outputfolder path in user prefs.
+        fprintf("saved progress to output folder: %s\n",savefilename);
     end
 
-    function ImportCallback();
+    function ImportCallback()
 
+        fig = uifigure;
+        msg = "Do you want to save your current progress before over-writing?";
+        title = "Save Progress";
+        selection=uiconfirm(fig,msg,title, ...
+            "Options",{'Save','Do not save'}, ...
+            "DefaultOption",1);
+        switch selection
+            case 'Save'
+                saveCallback()
+            case 'Do not save'
+                close(fig);
+        end
+
+        disp('CONTINUING') %DEBUG
+
+        [file, path] = uigetfile('*.mat', 'Select MAT file');
+        if isequal(file, 0)
+            disp('User canceled file selection.');
+            return;
+        end
+    
+        fullFile = fullfile(path, file);
+        vars = who('-file', fullFile);
+    
+        requiredVars = {'GPSpoints', 'UserPrefs'};
+        missingVars = setdiff(requiredVars, vars);
+    
+        if ~isempty(missingVars)
+            error('Missing required variables: %s', strjoin(missingVars, ', '));
+        end
+    
+        S=load(fullFile, requiredVars{:});
+        assignin('base', 'GPSpoints', S.GPSpoints);
+        assignin('base', 'UserPrefs', S.UserPrefs);
+
+        if~any(ismember(S.GPSpoints.Properties.VariableNames,"ImageU"))
+            error('.mat file contains GPSpoints but does not contain any importable GCP coordinates')
+        else
+            load(fullFile, requiredVars{:}); % this line will over0write current GPSpoints
+        end
+
+        updateFullFrame();
+        % redrawGCPS();
     end
 
     % Callback for Previous Button
@@ -319,21 +366,13 @@ function gps_map_gui(UserPrefs, GPSpoints)
     end
 
     function DeleteGCPcallback()
-        % Remove data in table
-        ImageUset=GPSpoints.ImageU(mask);
-        ImageUset(app.gcpIDX)=0;
-        GPSpoints.ImageU(mask)=ImageUset;
-        
-        ImageVset=GPSpoints.ImageV(mask);
-        ImageVset(app.gcpIDX)=0;
-        GPSpoints.ImageV(mask)=ImageVset;
-
         % Remove the point overlay if an entry exists
         Pointnum=app.UITable.Data.PointNum(app.gcpIDX);
         Pointnum=Pointnum{1};
-        if any(app.gcpPrevMarker.PointNum==Pointnum)
-            app.gcpPrevMarker(find(app.gcpPrevMarker.PointNum ==Pointnum),:)=[];
-        end
+
+        % Remove data in table
+        GPSpoints.ImageU(Pointnum)=0;
+        GPSpoints.ImageV(Pointnum)=0;
 
         updateTable();
         updateImageOverlay();
@@ -346,33 +385,15 @@ function gps_map_gui(UserPrefs, GPSpoints)
             x = round(clickedPoint(1));
             y = round(clickedPoint(2));
             % disp(['Clicked at (', num2str(x), ', ', num2str(y), ')']); %DEBUG
-
-            % Plot a marker at the clicked point
-            hold(app.IMGaxes, 'on');
-            scatterHandle = scatter(app.IMGaxes, x, y, 10, [240, 36, 209]/255, 'filled', 'o'); %blue
-            % scatterHandle = scatter(app.IMGaxes, x, y, 10, [240/255, 36/255, 209/255], 'filled', 'o');
-            scatterHandle.Visible = 'off';  % Hide it right away
-            hold(app.IMGaxes, 'off');
     
             % Store the marker info so it persists
+            
             Pointnum=app.UITable.Data.PointNum(app.gcpIDX);
             Pointnum=Pointnum{1};
-            newRow = table(Pointnum, x, y, scatterHandle, ...
-               'VariableNames', {'PointNum', 'X', 'Y', 'Handle'});
-            if any(app.gcpPrevMarker.PointNum==Pointnum)
-                app.gcpPrevMarker(find(app.gcpPrevMarker.PointNum ==Pointnum),:)=newRow;
-            else
-                app.gcpPrevMarker(end+1,:) = newRow;
-            end
-            
-            % Save data to table
-            ImageUset=GPSpoints.ImageU(mask);
-            ImageUset(app.gcpIDX)=x;
-            GPSpoints.ImageU(mask)=ImageUset;
-            
-            ImageVset=GPSpoints.ImageV(mask);
-            ImageVset(app.gcpIDX)=y;
-            GPSpoints.ImageV(mask)=ImageVset;
+
+            GPSpoints.ImageU(Pointnum)=x;
+            GPSpoints.ImageV(Pointnum)=y;
+            % GPSpoints.scatterHandle(Pointnum)=scatterHandle;
 
             updateImageOverlay();
             updateTable();

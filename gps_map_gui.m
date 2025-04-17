@@ -42,8 +42,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
 
        % Initialize the current index tracker for setnames
     setIDX = 1;
-
-    app.isPickingGCP = false;  % Set state
+    app.isPickingGCP = false;  % Set state sp that clicking on the image will not select A GCP yet
     app.gcpIDX=1; % IDX for individual GPS points within the set (for UV-picking)
 
     app.gcpHighlightMarker = [];  % Holds handles to GCP scatter plot on IMGaxes

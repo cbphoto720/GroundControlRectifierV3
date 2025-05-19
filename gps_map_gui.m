@@ -1,4 +1,4 @@
-function gps_map_gui(UserPrefs, GPSpoints)
+function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     % Load Colormap
     load("hawaiiS.txt"); % Load color map
     savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat("GCPSaveState_",num2str(UserPrefs.CamSN),".mat"));
@@ -203,7 +203,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
             set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
         else
             % Load and show actual image
-            app.img = imread(imgfile);
+            app.img = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
             hImg = imshow(app.img, 'Parent', app.IMGaxes);
             set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
         end
@@ -227,7 +227,7 @@ function gps_map_gui(UserPrefs, GPSpoints)
         end
         
         % plot the highlighted point in pink (even if the coords are 0,0
-        scatter(app.IMGaxes,GPSpoints.ImageU(Pointnum), GPSpoints.ImageV(Pointnum), ...
+        scatter(app.IMGaxes,GPSpoints.ImageU(find(GPSpoints.Name==Pointnum)), GPSpoints.ImageV(find(GPSpoints.Name==Pointnum)), ...
             10, [240, 36, 209]/255, 'filled', 'o', 'Tag', 'GCPscatter'); % Pink color
 
         hold(app.IMGaxes, 'off');
@@ -289,8 +289,6 @@ function gps_map_gui(UserPrefs, GPSpoints)
             case 'Do not save'
                 close(fig);
         end
-
-        disp('CONTINUING') %DEBUG
 
         [file, path] = uigetfile('*.mat', 'Select MAT file');
         if isequal(file, 0)
@@ -371,8 +369,8 @@ function gps_map_gui(UserPrefs, GPSpoints)
         Pointnum=Pointnum{1};
 
         % Remove data in table
-        GPSpoints.ImageU(Pointnum)=0;
-        GPSpoints.ImageV(Pointnum)=0;
+        GPSpoints.ImageU(find(GPSpoints.Name==Pointnum))=0;
+        GPSpoints.ImageV(find(GPSpoints.Name==Pointnum))=0;
 
         updateTable();
         updateImageOverlay();
@@ -391,8 +389,8 @@ function gps_map_gui(UserPrefs, GPSpoints)
             Pointnum=app.UITable.Data.PointNum(app.gcpIDX);
             Pointnum=Pointnum{1};
 
-            GPSpoints.ImageU(Pointnum)=x;
-            GPSpoints.ImageV(Pointnum)=y;
+            GPSpoints.ImageU(find(GPSpoints.Name==Pointnum))=x;
+            GPSpoints.ImageV(find(GPSpoints.Name==Pointnum))=y;
             % GPSpoints.scatterHandle(Pointnum)=scatterHandle;
 
             updateImageOverlay();

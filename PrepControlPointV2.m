@@ -113,7 +113,8 @@ GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
 path_to_CPG_CamDatabase_folder="C:\Users\Carson\Documents\Git\CPG_CameraDatabase";
 
 [UserPrefs.CamSN,UserPrefs.CamIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder);
-CameraDBentry=readCPG_CamDatabase(fullfile(path_to_CPG_CamDatabase_folder,'CPG_CamDatabase.yaml'), CamSN=UserPrefs.CamSN);
+% CameraDBentry=readCPG_CamDatabase(fullfile(path_to_CPG_CamDatabase_folder,'CPG_CamDatabase.yaml'), CamSN=UserPrefs.CamSN);
+CameraDBentry=readCPG_CamDatabase(format="searchtable", CamSN=UserPrefs.CamSN);
 
 % Find files in usable img folder 
 files = dir(fullfile(UserPrefs.UsableIMGsFolder,[filesep,'*.tif']));
@@ -122,7 +123,7 @@ files.datetime=datetime(files.datenum,'ConvertFrom','datenum'); % Create datetim
 
 %
 %WIP - Temporary until Filename is added to CPG_CamDatabase
-if contains(CameraDBentry.CamNickname, "Seacliff")
+if contains(CameraDBentry.Fieldsite, "Seacliff")
     filemask=contains(files.name, strcat("Seacliff_",string(CameraDBentry.CamSN)));
 else
     error(['Could not find any files in usable-imgs folder matching your selected camera SN.\n' ...
@@ -161,11 +162,20 @@ for i=1:length(INDvalues)
     GPSpoints.FileIDX(GPSpoints.Code==SetMask)=repmat(files.name(INDvalues(i)),length(GPSpoints.FileIDX(GPSpoints.Code==SetMask)),1);
 end
 
-%% Select GPS file
+%% Get UV coordinates from relevant GPS data
 
-%% %WIP Select a ROI for the GPS points!
+hFig = gps_map_gui(UserPrefs, GPSpoints);  % Get figure handle
+uiwait(hFig);  % Wait until the GUI resumes or is closed
 
-gps_map_gui(UserPrefs,GPSpoints);
+% Now do more actions (like loading the saved data)
+disp("GUI closed. Resuming main script...");
+
+% do more actions (like load in the saved data)
+outputmask=(GPSpoints.ImageU~=0);
+outtable=[GPSpoints.Northings(outputmask),GPSpoints.Eastings(outputmask),GPSpoints.H(outputmask),...
+    GPSpoints.ImageU(outputmask),GPSpoints.ImageV(outputmask)];
+
+
 
 %%
 % for fileIDX=1:length(filenames)
@@ -222,9 +232,10 @@ gps_map_gui(UserPrefs,GPSpoints);
 %WIP -update for new CPG_CamDatabase YAML format
 function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder)
     addpath(genpath(path_to_CPG_CamDatabase_folder));
-    CameraOptionsTable=readCPG_CamDatabase(fullfile(path_to_CPG_CamDatabase_folder,'CPG_CamDatabase.yaml'));
-    CameraOptionsTable.DateofGCP=[]; % remove date for display purposes
-    CameraOptionsTable.CamNickname=char(CameraOptionsTable.CamNickname); % convert to char
+    CameraOptionsTable=readCPG_CamDatabase(format="searchtable");
+    CameraOptionsTable.Date=[]; % remove date for display purposes
+    CameraOptionsTable.Fieldsite=char(CameraOptionsTable.Fieldsite); % convert to char
+    CameraOptionsTable.CamID=char(CameraOptionsTable.CamID); % convert to char
     CameraOptionsTable.Checkbox=false(height(CameraOptionsTable),1); % add checkbox for user selection
 
     Title = 'Pick camera profile from database';
@@ -243,11 +254,11 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_fo
 
     Prompt(end+1,:) = {'Item Table','Table',[]};
     Formats(2,1).type = 'table';
-    % Formats(1,1).format = {'char', {'left','right'}, 'numeric' 'logical'}; % table (= table in main dialog) / window (= table in separate dialog)
-    Formats(2,1).items = {'CamSN' 'CamNickname'};
+    Formats(2,1).items = {'Fieldsite', 'CamSN', 'CamID', 'Checkbox'};
+    Formats(2,1).format = {'char', 'char', 'char', 'logical'};
     Formats(2,1).size = [-1 -1];
     DefAns.Table = table2cell(CameraOptionsTable);
-    % DefAns.Table = cellfun(@string, table2cell(CameraOptionsTable), 'UniformOutput', false);
+
 
 
     [answers, cancelled] = inputsdlg(Prompt, Title, Formats, DefAns, Options);
@@ -260,7 +271,7 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_fo
             error('Please select only 1 camera!');
         else
             rowIDX = find(lastCol, 1); % Find the first row where true appears
-            searchKeyoption=answers.Table{rowIDX, 1}; % Extract the first column value
+            searchKeyoption=answers.Table{rowIDX, 2}; % Extract the 2nd column value (CamSN)
         end
     else
         error('User selected cancel!');

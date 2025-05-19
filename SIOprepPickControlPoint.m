@@ -425,7 +425,118 @@ datetimeIdx = cellfun(@(x) isa(x, 'datetime'), searchmatrix);
 datetimeValues = searchmatrix(datetimeIdx)
 
 
+% function isValid = checkDDateFormat(inputStr)
+%     pattern = '^D\d{8}$'; % D followed by exactly 8 digits
+%     isValid = ~isempty(regexp(inputStr, pattern, 'once'));
+% end
+
+%% 20250421
+yamlData = yaml.loadFile('CPG_CamDatabase.yaml');
+DBstruct=struct();
+searchtable=table( strings(0,1), strings(0,1), strings(0,1), cell(0,1),'VariableNames', {'CamSN', 'CamID', 'Site', 'Date'});
+
+r=1; % set searchtable counter to 0
+for i=1:length(yamlData) % make a struct for each site
+    DBstruct.(yamlData{i}.SiteID)={};
+    for j=1:numel(yamlData{i}.Cameras) % make a struct for each camera
+        DBstruct.(yamlData{i}.SiteID).(yamlData{i}.Cameras{j}.CamID)=yamlData{i}.Cameras{j};
+        surveydates=fieldnames(yamlData{i}.Cameras{j});
+        surveydates(ismember(surveydates, {'CamID', 'CamSN'})) = []; % remove non-date elements
+        searchtable(r, :) = {yamlData{i}.Cameras{j}.CamSN, yamlData{i}.Cameras{j}.CamID, yamlData{i}.SiteID, surveydates};
+        r=r+1;
+    end
+end
+clear i j r
+
+%% 20250421
+
+for i=1:length(surveydates)
+    if checkDDateFormat(surveydates{i})
+        datetime(surveydates{i}, "InputFormat", "'D'yyyyMMdd'T'HHmmss'Z'")
+    end
+end
+
 function isValid = checkDDateFormat(inputStr)
-    pattern = '^D\d{8}$'; % D followed by exactly 8 digits
+    pattern = '^D\d{8}T\d{6}Z$'; % D + 8 digits (date) + T + 6 digits (time) + Z
     isValid = ~isempty(regexp(inputStr, pattern, 'once'));
 end
+
+function DToutput = parseDDate(dateinput)
+     % Parse the date in ISO 8601 format
+        % date=extractBefore(extractAfter(dateinput,"D"), "T");
+        % time=extractBefore(extractAfter(dateinput,"T"),"Z"); % Notice that non-UTC times are NOT SUPPORTED
+        % date=strcat(date,time);
+        % date=str2double(date);
+
+        % date=extractAfter(dateinput,"D");
+        
+        DToutput = datetime(dateinput, "InputFormat", "'D'yyyyMMdd'T'HHmmss'Z'");
+end
+
+%% 20250422
+
+options.Date=searchtable.Date{4}{2}; % sample date choice
+% Mask=zeros(size(searchtable,1),size(searchtable,2));
+
+% for i=1:height(searchtable) % Loop through searchtable
+%     for j=1:numel(searchtable.Date{i}) % loop through dates within each camera
+% 
+%     end
+% end
+
+% Helper function
+function dtArray = normalizeDateEntry(x)
+    if iscell(x) && all(cellfun(@isdatetime, x))
+        dtArray = datetime([x{:}]);
+    elseif isdatetime(x)
+        dtArray = x;
+    else
+        dtArray = NaT;
+    end
+end
+
+function [outflag,outIND] = CompareDTarray(x, target, threshold)
+    diff=x - target;
+    diff(diff<0)=days(9999); % set placeholder value
+    
+    [outflag,outIND]=min(diff);
+end
+
+% ChooseBestSurveyDate = @(x, target, threshold) any(x - target < threshold);
+% ChooseBestSurveyDate = @(x, target, threshold) x - target;
+
+
+% target=datetime(now(),'ConvertFrom','datenum','TimeZone','UTC');
+target=searchtable.Date{2}{1};
+threshold=hours(1);
+
+% Apply it
+normalizedDateCells = cellfun(@normalizeDateEntry, searchtable.Date, 'UniformOutput', false);
+
+result = cellfun(@(x) CompareDTarray(x, target), normalizedDateCells, 'UniformOutput', false);
+
+for i=1:height(result)
+    result2(i)=result{i};
+end
+
+
+disp(result2)
+
+%%
+
+Seaclifftable=readCPG_CamDatabase(Fieldsite="Seacliff",format="searchtable")
+OCT23toJAN22=Seaclifftable.Date{1}(1);
+JAN23toPRESENT=Seaclifftable.Date{1}(1);
+SeaclifCam1=readCPG_CamDatabase(Fieldsite="Seacliff",CamSN=22296748,Date=Oldestdate,format="compact")
+
+%% 20250513
+avgGPS(GPSpoints,"Northings",[3:5]);
+avgGPS(GPSpoints,"Eastings",[3:5]);
+avgGPS(GPSpoints,"Elevation",[3:5]);
+
+%% 20250519
+
+cam_21217396POS=[36.9699952963,-121.9075239770,31.334]
+outputmask = GPSpoints.ImageU~=0;
+
+ pose = EstimateCameraPose(cam_21217396POS,GPSpoints(outputmask,:))

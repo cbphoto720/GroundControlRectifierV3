@@ -6,10 +6,10 @@
 %% Options
 load("hawaiiS.txt"); % Load color map
 
-filename="20250226_Cabrillo-Benchmarks.txt";
+filename="20250508_Seacliff_TargetGCPs.txt";
 
 Addlabels=true; % (boolean) Add labels to each point based on Code description
-drawcircles=2; % (m) Draw circles around each point set to "0" meters to turn off
+drawcircles=0; % (m) Draw circles around each point set to "0" meters to turn off
 
 GPSpoints=importGPSpoints(filename);
 %% Generate Map
@@ -46,7 +46,8 @@ end
 
 % Add labels
 if Addlabels
-    a=strcat(GPSpoints.Code,num2str(GPSpoints.Name));
+    % a=strcat(GPSpoints.Code,num2str(GPSpoints.Name));
+    a=num2str(GPSpoints.Name);
     c=cellstr(a);
     % Randomize the label direction by creating a unit vector.
     vec=-1+(1+1)*rand(length(a),2);

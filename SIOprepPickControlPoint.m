@@ -535,8 +535,57 @@ avgGPS(GPSpoints,"Eastings",[3:5]);
 avgGPS(GPSpoints,"Elevation",[3:5]);
 
 %% 20250519
+CPGDB=readCPG_CamDatabase()
+CPGDB.Seacliff.Cam3.D20250122T220000Z.CamPose.Northings
 
-cam_21217396POS=[36.9699952963,-121.9075239770,31.334]
+% cam_21217396POS=[36.9699952963,-121.9075239770,31.334]
+
+
 outputmask = GPSpoints.ImageU~=0;
+pose = EstimateCameraPose(cam_21217396POS,GPSpoints(outputmask,:))
 
- pose = EstimateCameraPose(cam_21217396POS,GPSpoints(outputmask,:))
+%% 20250521
+
+CPGDB=readCPG_CamDatabase()
+CPGDB.Seacliff.Cam3.D20250122T220000Z.CamPose.Northings
+
+utmstruct = defaultm('utm');
+utmstruct.zone = '10N';
+utmstruct.geoid = wgs84Ellipsoid;
+utmstruct = defaultm(utmstruct);
+
+[lat, lon] = projinv(utmstruct,str2num(CPGDB.Seacliff.Cam3.D20250122T220000Z.CamPose.Eastings),str2num(CPGDB.Seacliff.Cam3.D20250122T220000Z.CamPose.Northings))
+
+%% CALCULATE 
+% load the savestate from the PrepControlPoint GUI (GPSpoints with UV coordinates)
+addpath(genpath("C:\Users\Carson\Documents\Carson\Projects\Seacliff_Cam_Station\Rectification"))
+CPGDB=readCPG_CamDatabase();
+
+outputmask = GPSpoints.ImageU~=0; % ignore GPS points that don't have pixel coordinates
+[pose, xyzGCP] = EstimateCameraPose(CPGDB.Seacliff.Cam2.D20250122T220000Z,GPSpoints(outputmask,:)); % get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
+
+readDB=readCPG_CamDatabase(CamSN=22296760,Date="20250122T220000Z",format="compact"); % Generate ICP based on a previous survey
+icp=readDB.icp;
+icp = makeRadialDistortion(icp);
+icp = makeTangentialDistortion(icp);
+
+betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
+%% Use betaOUT to rectify!
+[U, V] = meshgrid(0:icp.NU-1, 0:icp.NV-1);  %find U, V coordinates
+[Xa, Ya, ~] = getXYZfromUV(U, V, icp, betaOUT, 0, '-z');    %find FRF X, Y coordinates
+
+ocean = imread('\\reefbreak.ucsd.edu\camera\Seacliff\Calibration\20250508\gps_raw\usable-images\Seacliff_21217396_1746729385681.tif');
+ocean = double(rgb2gray(ocean));
+
+figure
+hold on
+view = pcolor(Xa,Ya,ocean);
+set(view,'EdgeColor','none');
+
+colormap('gray')
+ylim([-50 150])
+xlim([-100 100])
+ax = gca;
+set(ax,'DataAspectRatio', [1 1 1]);
+ylabel('Alongshore (m)')
+xlabel('Cross-shore (m)')

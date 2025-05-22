@@ -165,9 +165,9 @@ end
 %% Get UV coordinates from relevant GPS data
 
 hFig = gps_map_gui(UserPrefs, GPSpoints);  % Get figure handle
-uiwait(hFig);  % Wait until the GUI resumes or is closed
+% uiwait(hFig);  % Wait until the GUI resumes or is closed
 
-% Now do more actions (like loading the saved data)
+%% Generate Cam pose based on the GPS points
 disp("GUI closed. Resuming main script...");
 
 % do more actions (like load in the saved data)

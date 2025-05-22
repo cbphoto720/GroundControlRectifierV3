@@ -1,7 +1,7 @@
 function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     % Load Colormap
     load("hawaiiS.txt"); % Load color map
-    savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat("GCPSaveState_",num2str(UserPrefs.CamSN),".mat"));
+    savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat(num2str(UserPrefs.SurveyDate),"_GCPSaveState_Cam",num2str(UserPrefs.CamSN),".mat"));
 
     % Get screen size for positioning the figure
     set(0, 'units', 'pixels');
@@ -271,8 +271,9 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     end
 
     function saveCallback()
-        save(savefilename,"GPSpoints","UserPrefs") %WIP - Save file should be to outputfolder path in user prefs.
-        fprintf("saved progress to output folder: %s\n",savefilename);
+        [savefilename,location]=uiputfile(savefilename, 'Save As'); % pull up SaveAs dialog (write new name if user wants to change it)
+        save(fullfile(location,savefilename),"GPSpoints","UserPrefs") %WIP - Save file should be to outputfolder path in user prefs.
+        fprintf("saved progress to output folder: %s\n",fullfile(location,savefilename));
     end
 
     function ImportCallback()

@@ -37,16 +37,16 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
     r = r + 1;
     c = 1;
 
-    Prompt(end+1,:) = {'Max Points in Set', 'MaxPoints', []};
-    Formats(r,c).type = 'edit';
-    Formats(r,c).format = 'integer';
-    Formats(r,c).limits = [1 inf]; % Must be positive integer
-    Formats(r,c).size = 50;
-    if isfield(DefAns, 'MaxPoints')
-        % Formats(r,c).defAns = DefAns.MaxPoints; % Use saved preference if available
-    else
-        DefAns(1).MaxPoints = 5; % Default value
-    end
+    % Prompt(end+1,:) = {'Max Points in Set', 'MaxPoints', []};
+    % Formats(r,c).type = 'edit';
+    % Formats(r,c).format = 'integer';
+    % Formats(r,c).limits = [1 inf]; % Must be positive integer
+    % Formats(r,c).size = 50;
+    % if isfield(DefAns, 'MaxPoints')
+    %     % Formats(r,c).defAns = DefAns.MaxPoints; % Use saved preference if available
+    % else
+    %     DefAns(1).MaxPoints = 5; % Default value
+    % end
     c = c + 1;
 
     Prompt(end+1,:) = {'Date of Survey (YYYYMMDD)', 'SurveyDate', []};
@@ -54,7 +54,7 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
     Formats(r,c).format = 'text';
     Formats(r,c).size = 100;
     if ~isfield(DefAns, 'SurveyDate')
-        DefAns.SurveyDate = char(datetime('now', 'Format', 'yyyyMMdd')); % Default to today's date
+        DefAns(1).SurveyDate = char(datetime('now', 'Format', 'yyyyMMdd')); % Default to today's date
     end
     r = r + 1;
     c = 1;
@@ -62,7 +62,7 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
     Prompt(end+1,:) = {'Camera Database File', 'CameraDB', []};
     Formats(r,c).type = 'edit';
     Formats(r,c).format = 'file';
-    Formats(r,c).items = {'*.txt;*.csv','Text/CSV Files';'*.*','All Files'};
+    Formats(r,c).items = {'*.yaml;*.yml','YAML file';'*.*','All Files'};
     Formats(r,c).limits = [0 1]; % Single file selection
     Formats(r,c).size = [-1 0];
     if isfield(DefAns, 'CameraDB')
@@ -123,7 +123,7 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
     Formats(r,c).size = [-1 0];
     Formats(r,c).span = [1 2]; % Spanning across columns
     if ~isfield(DefAns, 'OutputFolderName')
-        DefAns.OutputFolderName = 'ready_for_PickControlPoint'; % Default to current directory
+        DefAns.OutputFolderName = strcat(sprintf('%s',datetime(now(),'convertfrom','datenum','Format','yyyyMMdd')),'_GCPpickerOutput'); % Default to current directory
     end
     r = r + 1;
 

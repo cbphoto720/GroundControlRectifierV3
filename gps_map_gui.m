@@ -2,6 +2,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     % Load Colormap
     load("hawaiiS.txt"); % Load color map
     savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat(num2str(UserPrefs.SurveyDate),"_GCPSaveState_Cam",num2str(UserPrefs.CamSN),".mat"));
+    app.IMGtitle=sprintf("Cam %d, SN %d", UserPrefs.CamIDX, UserPrefs.CamSN);
 
     % Get screen size for positioning the figure
     set(0, 'units', 'pixels');
@@ -72,10 +73,25 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
 
     %% GUI Elements
 
+    % Create grid for IMG title (right side for image display)
+    app.IMGlayoutGrid = uigridlayout(app.MainGridLayout);
+    app.IMGlayoutGrid.Layout.Row = 1;
+    app.IMGlayoutGrid.Layout.Column = 2;
+    app.IMGlayoutGrid.RowHeight = {'0.1x', '1x'};
+    app.IMGlayoutGrid.ColumnWidth = {'1x', '0.1x'};
+    app.IMGlayoutGrid.Padding= [0 0 0 0];
+    app.IMGlayoutGrid.RowSpacing = 0;
+
+    % Create title for the img
+    app.IMG_desc_label = uilabel(app.IMGlayoutGrid, 'Text', sprintf("Cam %d, SN %d", UserPrefs.CamIDX, UserPrefs.CamSN), ...
+        'FontSize', 20, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
+    app.IMG_desc_label.Layout.Row = 1;
+    app.IMG_desc_label.Layout.Column = 1;
+
     % Create UIAxes2 (right side for image display)
-    app.IMGaxes = axes(app.MainGridLayout);
-    app.IMGaxes.Layout.Row = 1;
-    app.IMGaxes.Layout.Column = 2;
+    app.IMGaxes = axes(app.IMGlayoutGrid);
+    app.IMGaxes.Layout.Row = 2;
+    app.IMGaxes.Layout.Column = [1 2];
 
      % Create IMGButtonGrid for buttons at the bottom of the IMG plot
     app.IMGButtonGrid = uigridlayout(app.MainGridLayout);
@@ -202,10 +218,22 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
             hImg = imshow(app.img, 'Parent', app.IMGaxes);
             set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
         else
+            if exist(fullfile(UserPrefs.UsableIMGsFolder,imgfile))
             % Load and show actual image
-            app.img = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
-            hImg = imshow(app.img, 'Parent', app.IMGaxes);
-            set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
+                app.img = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
+                hImg = imshow(app.img, 'Parent', app.IMGaxes);
+                set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
+            else
+                title = "UsableIMGsFolder";
+                quest = [sprintf("Unable to find img: %s",imgfile), "Would you like to re-select the Usable-imgs folder?"];
+                pbtns = ["Yes","No"];
+                
+                Switchfolder = questdlg(quest,title, pbtns);
+                if strcmp(Switchfolder,"Yes")
+                    UserPrefs.UsableIMGsFolder=uigetdir(UserPrefs.UsableIMGsFolder);
+                    updateImage();
+                end
+            end
         end
         updateImageOverlay();
     end
@@ -271,9 +299,15 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     end
 
     function saveCallback()
-        [savefilename,location]=uiputfile(savefilename, 'Save As',UserPrefs.OutputFolder); % pull up SaveAs dialog (write new name if user wants to change it)
-        save(fullfile(location,savefilename),"GPSpoints","UserPrefs") %WIP - Save file should be to outputfolder path in user prefs.
-        fprintf("saved progress to output folder: %s\n",fullfile(location,savefilename));
+        temp=savefilename;
+        [savefilename,savelocation]=uiputfile('*.mat', 'Save As',savefilename); % pull up SaveAs dialog (write new name if user wants to change it)
+        if savefilename == 0 % handle user cancel input
+            savefilename=temp;
+            return % do not proceed with saving, because user cancelled
+        else
+            save(fullfile(savelocation,savefilename),"GPSpoints","UserPrefs") %WIP - Save file should be to outputfolder path in user prefs.
+            fprintf("saved progress to output folder: %s\n",fullfile(savelocation,savefilename));
+        end
     end
 
     function ImportCallback()

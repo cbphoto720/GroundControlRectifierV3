@@ -589,3 +589,28 @@ ax = gca;
 set(ax,'DataAspectRatio', [1 1 1]);
 ylabel('Alongshore (m)')
 xlabel('Cross-shore (m)')
+
+%% 20250709
+
+function diffReport = compareStructs(struct1, struct2)
+    % Compare two structs with the same fields
+    % Returns a struct with fields where values differ
+
+    % Get all field names
+    fields1 = fieldnames(struct1);
+    diffReport = struct();  % Output struct to hold differences
+
+    for i = 1:numel(fields1)
+        field = fields1{i};
+        val1 = struct1.(field);
+        val2 = struct2.(field);
+
+        % Use isequaln to compare (treats NaN == NaN as true)
+        if ~isequaln(val1, val2)
+            diffReport.(field).struct1 = val1;
+            diffReport.(field).struct2 = val2;
+        end
+    end
+end
+
+compareStructs(UserPrefsCORRECT,UserPrefs)

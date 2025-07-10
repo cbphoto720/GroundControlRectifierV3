@@ -171,9 +171,14 @@ hFig = gps_map_gui(UserPrefs, GPSpoints);  % Get figure handle
 disp("GUI closed. Resuming main script...");
 
 % do more actions (like load in the saved data)
-outputmask=(GPSpoints.ImageU~=0);
-outtable=[GPSpoints.Northings(outputmask),GPSpoints.Eastings(outputmask),GPSpoints.H(outputmask),...
-    GPSpoints.ImageU(outputmask),GPSpoints.ImageV(outputmask)];
+outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
+[pose, xyzGCP] = EstimateCameraPose(CPGDB.Seacliff.Cam2.D20250122T220000Z,GPSpoints(outputmask,:)); % get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
+
+% Generate ICP (Internal Camera Parameters [Intrinsics]) based on a previous survey
+readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date="20250122T220000Z",format="compact");
+icp=readDB.icp;
+icp = makeRadialDistortion(icp);
+icp = makeTangentialDistortion(icp);
 
 
 

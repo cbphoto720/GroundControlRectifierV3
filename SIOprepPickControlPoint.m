@@ -560,11 +560,13 @@ utmstruct = defaultm(utmstruct);
 % load the savestate from the PrepControlPoint GUI (GPSpoints with UV coordinates)
 addpath(genpath("C:\Users\Carson\Documents\Carson\Projects\Seacliff_Cam_Station\Rectification"))
 CPGDB=readCPG_CamDatabase();
+load("20250508_GCPSaveState_Cam21217396.mat"); %Load savestate from Cam2
 
-outputmask = GPSpoints.ImageU~=0; % ignore GPS points that don't have pixel coordinates
+% outputmask = GPSpoints.ImageU~=0; % ignore GPS points that don't have pixel coordinates ** Can't exactly do this because we loose which ponits go to which GPS column.
+outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
 [pose, xyzGCP] = EstimateCameraPose(CPGDB.Seacliff.Cam2.D20250122T220000Z,GPSpoints(outputmask,:)); % get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
 
-readDB=readCPG_CamDatabase(CamSN=22296760,Date="20250122T220000Z",format="compact"); % Generate ICP based on a previous survey
+readDB=readCPG_CamDatabase(CamSN=22296760,Date="20250122T220000Z",format="compact"); % Generate ICP (Intrinsics) based on a previous survey
 icp=readDB.icp;
 icp = makeRadialDistortion(icp);
 icp = makeTangentialDistortion(icp);
@@ -574,7 +576,7 @@ betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints
 [U, V] = meshgrid(0:icp.NU-1, 0:icp.NV-1);  %find U, V coordinates
 [Xa, Ya, ~] = getXYZfromUV(U, V, icp, betaOUT, 0, '-z');    %find FRF X, Y coordinates
 
-ocean = imread('\\reefbreak.ucsd.edu\camera\Seacliff\Calibration\20250508\gps_raw\usable-images\Seacliff_21217396_1746729385681.tif');
+ocean = imread('\\reefbreak.ucsd.edu\camera\Seacliff\Calibration\20250508\usable-images\Seacliff_21217396_1746729385681.tif');
 ocean = double(rgb2gray(ocean));
 
 figure
@@ -590,7 +592,12 @@ set(ax,'DataAspectRatio', [1 1 1]);
 ylabel('Alongshore (m)')
 xlabel('Cross-shore (m)')
 
-%% 20250709
+%% Use beta to back-calculate the expected Image Coords of real-world coordinate (converted to the camera LCS)
+[IMAGEu1, IMAGEv1] = getUVfromXYZ(xyzGCP(1,1), xyzGCP(1,2), xyzGCP(1,3), icp, betaOUT)
+
+% then you could do math like GPSpoints.ImageU(outputmask,1)
+
+%% 20250709 Comparing structs from previous save states
 
 function diffReport = compareStructs(struct1, struct2)
     % Compare two structs with the same fields

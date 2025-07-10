@@ -112,7 +112,7 @@ GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
 %WIP TEMP FIX
 path_to_CPG_CamDatabase_folder="C:\Users\Carson\Documents\Git\CPG_CameraDatabase";
 
-[UserPrefs.CamSN,UserPrefs.CamIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder);
+[UserPrefs.CamFieldSite,UserPrefs.CamSN,UserPrefs.CamNickName]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder);
 % CameraDBentry=readCPG_CamDatabase(fullfile(path_to_CPG_CamDatabase_folder,'CPG_CamDatabase.yaml'), CamSN=UserPrefs.CamSN);
 CameraDBentry=readCPG_CamDatabase(format="searchtable", CamSN=UserPrefs.CamSN);
 
@@ -165,22 +165,26 @@ end
 %% Get UV coordinates from relevant GPS data
 
 hFig = gps_map_gui(UserPrefs, GPSpoints);  % Get figure handle
-% uiwait(hFig);  % Wait until the GUI resumes or is closed
+uiwait(hFig);  % Wait until the GUI resumes or is closed
 
 %% Generate Cam pose based on the GPS points
 disp("GUI closed. Resuming main script...");
+CPGDB=readCPG_CamDatabase();
 
 % do more actions (like load in the saved data)
 outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
-[pose, xyzGCP] = EstimateCameraPose(CPGDB.Seacliff.Cam2.D20250122T220000Z,GPSpoints(outputmask,:)); % get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
+[pose, xyzGCP] = EstimateCameraPose(CPGDB.Seacliff.Cam2.D20250122T220000Z,GPSpoints(outputmask,:)); %WIP TEMP get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
+
+[UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CameraDB,UserPrefs.CamSN);
 
 % Generate ICP (Internal Camera Parameters [Intrinsics]) based on a previous survey
-readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date="20250122T220000Z",format="compact");
+readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=UserPrefs.DateofICP,format="compact");
 icp=readDB.icp;
 icp = makeRadialDistortion(icp);
 icp = makeTangentialDistortion(icp);
-
-
+        
+%%
+betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
 
 %%
 %{ 
@@ -195,7 +199,7 @@ icp = makeTangentialDistortion(icp);
 %}
 
 %% Pick Camera From Database
-function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder)
+function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder)
     addpath(genpath(path_to_CPG_CamDatabase_folder));
     CameraOptionsTable=readCPG_CamDatabase(format="searchtable");
     CameraOptionsTable.Date=[]; % remove date for display purposes
@@ -236,7 +240,59 @@ function [searchKeyoption,rowIDX]=PickCamFromDatabase(path_to_CPG_CamDatabase_fo
             error('Please select only 1 camera!');
         else
             rowIDX = find(lastCol, 1); % Find the first row where true appears
-            searchKeyoption=answers.Table{rowIDX, 2}; % Extract the 2nd column value (CamSN)
+            CamNickName=answers.Table{rowIDX, 3};
+            CamNickName=strtrim(CamNickName); %remove spaces
+            CamFieldSite=answers.Table{rowIDX, 1};
+            CamFieldSite=strtrim(CamFieldSite); %remove spaces
+            CamSN=answers.Table{rowIDX, 2}; % Extract the 2nd column value (CamSN)
+        end
+    else
+        error('User selected cancel!');
+    end
+end
+
+function [searchKeyoption,rowIDX]=PickCamIntrinsicsDate(path_to_CPG_CamDatabase_folder,CamSerialNumber)
+    addpath(genpath(path_to_CPG_CamDatabase_folder));
+    CamDBread=readCPG_CamDatabase(CamSN=CamSerialNumber,Format="searchtable");
+    dateArray = CamDBread.Date{:};
+    DateOptionsTable = table(dateArray', 'VariableNames', {'Date'});
+    DateOptionsTable.Date = datestr(DateOptionsTable.Date, 'yyyymmddThhMMssZ');  % or use any format you like
+    DateOptionsTable.Checkbox=false(height(DateOptionsTable),1); % add checkbox for user selection
+
+    Title = 'Pick Intrinsics from a GCP date';
+    Options.Resize = 'on';
+    Options.Interpreter = 'tex';
+    Options.CancelButton = 'on';
+    Options.ApplyButton = 'off';
+    Options.ButtonNames = {'Continue','Cancel'};
+    
+    Prompt = {};
+    Formats = {};
+
+    Prompt(1,:) = {'Select only 1 date from the checkbox!', [], []};
+    Formats(1,1).type = 'text';
+    Formats(1,1).size = [-1 0];
+
+    Prompt(end+1,:) = {'Item Table','Table',[]};
+    Formats(2,1).type = 'table';
+    Formats(2,1).items = {'Date','Checkbox'};
+    Formats(2,1).format = {'char', 'logical'};
+    Formats(2,1).size = [-1 -1];
+    DefAns.Table = table2cell(DateOptionsTable);
+
+
+
+    [answers, cancelled] = inputsdlg(Prompt, Title, Formats, DefAns, Options);
+
+    if ~cancelled
+        lastCol = cell2mat(answers.Table(:, end)); % Convert last column to logical/array
+        numTrue = sum(lastCol); % Count the number of true values
+        
+        if numTrue ~= 1
+            error('Please select only 1 camera!');
+        else
+            rowIDX = find(lastCol, 1); % Find the first row where true appears
+            searchKeyoption=strcat(answers.Table{rowIDX, 1},"Z"); % Extract the 2nd column value (CamSN)
         end
     else
         error('User selected cancel!');

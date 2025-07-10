@@ -1,8 +1,6 @@
 function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     % Load Colormap
     load("hawaiiS.txt"); % Load color map
-    savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat(num2str(UserPrefs.SurveyDate),"_GCPSaveState_Cam",num2str(UserPrefs.CamSN),".mat"));
-    app.IMGtitle=sprintf("Cam %d, SN %d", UserPrefs.CamIDX, UserPrefs.CamSN);
 
     % Get screen size for positioning the figure
     set(0, 'units', 'pixels');
@@ -83,7 +81,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     app.IMGlayoutGrid.RowSpacing = 0;
 
     % Create title for the img
-    app.IMG_desc_label = uilabel(app.IMGlayoutGrid, 'Text', sprintf("Cam %d, SN %d", UserPrefs.CamIDX, UserPrefs.CamSN), ...
+    app.IMG_desc_label = uilabel(app.IMGlayoutGrid, 'Text', sprintf("%s, %s, SN %d", UserPrefs.CamFieldSite, UserPrefs.CamNickName, UserPrefs.CamSN), ...
         'FontSize', 20, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
     app.IMG_desc_label.Layout.Row = 1;
     app.IMG_desc_label.Layout.Column = 1;
@@ -208,6 +206,9 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
 
     % Function to update the image display
     function updateImage()
+        %update title in the top corner:
+        app.IMG_desc_label.Text=sprintf("%s, %s, SN %d", UserPrefs.CamFieldSite, UserPrefs.CamNickName, UserPrefs.CamSN);
+
         % Get the image filename from FileIDX based on setIDX
         mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
         imgfile = GPSpoints.FileIDX(mask);
@@ -299,6 +300,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     end
 
     function saveCallback()
+        savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat("PrepControlPoint-",num2str(UserPrefs.SurveyDate),UserPrefs.CamFieldSite, UserPrefs.CamNickName, "_SN",num2str(UserPrefs.CamSN),".mat"));
         temp=savefilename;
         [savefilename,savelocation]=uiputfile('*.mat', 'Save As',savefilename); % pull up SaveAs dialog (write new name if user wants to change it)
         if savefilename == 0 % handle user cancel input
@@ -455,7 +457,3 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     % Initial Highlight and Image Update
     updateFullFrame();
 end
-
-%% Scatch paper
-
-% scatterHandle = scatter(app.IMGaxes, x, y, 100, [240/255, 36/255, 0.7059], 'filled', 'o');

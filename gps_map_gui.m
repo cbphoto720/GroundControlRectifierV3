@@ -1,4 +1,4 @@
-function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
+function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     % Load Colormap
     load("hawaiiS.txt"); % Load color map
 
@@ -32,7 +32,9 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     %% Variables
 
     GPSpoints.ImageU=zeros(height(GPSpoints),1);
-    GPSpoints.ImageV=zeros(height(GPSpoints),1);
+    GPSpoints.ImageV=GPSpoints.ImageU;
+    GPSpoints.RECTIFYu1=GPSpoints.ImageU;
+    GPSpoints.RECTIFYv1=GPSpoints.ImageU;
     % GPSpoints.scatterHandle=gobjects(height(GPSpoints), 1);
 
     % Get unique descriptions (setnames)
@@ -142,6 +144,12 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
     app.ImportButton.ButtonPushedFcn = @(~,~) ImportCallback();
     app.ImportButton.Layout.Row = 1;
     app.ImportButton.Layout.Column = 1;
+
+    % Create Calculate button
+    app.CalcButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Calculate!');
+    app.CalcButton.ButtonPushedFcn = @(~,~) CalculateCallback();
+    app.CalcButton.Layout.Row = 2;
+    app.CalcButton.Layout.Column = 3;
 
     % Create Back Button
     app.BackButton = uibutton(app.GPSButtonGrid, 'push', 'Text', '<< Prev set');
@@ -258,6 +266,13 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
         % plot the highlighted point in pink (even if the coords are 0,0
         scatter(app.IMGaxes,GPSpoints.ImageU(find(GPSpoints.Name==Pointnum)), GPSpoints.ImageV(find(GPSpoints.Name==Pointnum)), ...
             10, [240, 36, 209]/255, 'filled', 'o', 'Tag', 'GCPscatter'); % Pink color
+        
+        % Plot rectified image U V projections
+        PROJECTIONpoints_GCPplot=GPSpoints(GPSpoints.RECTIFYu1~=0,:);
+        for i=1:height(PROJECTIONpoints_GCPplot)
+            scatter(app.IMGaxes, GPSpoints.RECTIFYu1(i), GPSpoints.RECTIFYv1(i), ...
+                    20, [252, 86, 3]/255, 'o', 'Tag', 'GCPscatter'); % Orange color
+        end
 
         hold(app.IMGaxes, 'off');
     end
@@ -310,6 +325,27 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints)
             save(fullfile(savelocation,savefilename),"GPSpoints","UserPrefs") %WIP - Save file should be to outputfolder path in user prefs.
             fprintf("saved progress to output folder: %s\n",fullfile(savelocation,savefilename));
         end
+    end
+
+    function CalculateCallback()
+        outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
+        [pose, xyzGCP] = EstimateCameraPose(FullCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:));
+
+        % Generate ICP (Internal Camera Parameters [Intrinsics]) based on a previous survey
+        readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=string(UserPrefs.DateofICP(2:end)),format="compact");
+        icp=readDB.icp;
+        icp = makeRadialDistortion(icp);
+        icp = makeTangentialDistortion(icp);
+                
+        betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
+
+        for i=1:length(outputmask)
+            [GPSpoints.RECTIFYu1(outputmask(i)), GPSpoints.RECTIFYv1(outputmask(i))] = getUVfromXYZ(xyzGCP(i,1), xyzGCP(i,2), xyzGCP(i,3), icp, betaOUT);
+        end
+        fprintf("Beta parameters:\n");
+        fprintf("%16.6f",betaOUT);
+        fprintf("\n");
+        updateFullFrame()
     end
 
     function ImportCallback()

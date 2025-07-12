@@ -109,12 +109,15 @@ clear cancelled DefaultOpsFile
 
 %% Pick Camera from database
 GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
-%WIP TEMP FIX
-path_to_CPG_CamDatabase_folder="C:\Users\Carson\Documents\Git\CPG_CameraDatabase";
 
-[UserPrefs.CamFieldSite,UserPrefs.CamSN,UserPrefs.CamNickName]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder);
-% CameraDBentry=readCPG_CamDatabase(fullfile(path_to_CPG_CamDatabase_folder,'CPG_CamDatabase.yaml'), CamSN=UserPrefs.CamSN);
-CameraDBentry=readCPG_CamDatabase(format="searchtable", CamSN=UserPrefs.CamSN);
+[path_to_CPG_CamDatabase_folder, ~, ~] = fileparts(UserPrefs.CameraDB);
+addpath(genpath(path_to_CPG_CamDatabase_folder));
+
+% Have user select Camera and Intrinsics they want to use for this rectification
+[UserPrefs.CamFieldSite,UserPrefs.CamSN,UserPrefs.CamNickName]=PickCamFromDatabase();
+[UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CamSN);
+
+FullCamDB=readCPG_CamDatabase("CamSN",UserPrefs.CamSN);
 
 % Find files in usable img folder 
 files = dir(fullfile(UserPrefs.UsableIMGsFolder,[filesep,'*.tif']));
@@ -123,6 +126,7 @@ files.datetime=datetime(files.datenum,'ConvertFrom','datenum'); % Create datetim
 
 %
 %WIP - Temporary until Filename is added to CPG_CamDatabase
+CameraDBentry=readCPG_CamDatabase(format="searchtable", CamSN=UserPrefs.CamSN);
 if contains(CameraDBentry.Fieldsite, "Seacliff")
     filemask=contains(files.name, strcat("Seacliff_",string(CameraDBentry.CamSN)));
 else
@@ -142,10 +146,6 @@ for i=1:numpoints
 end
 minIND(isnan(dif))=NaN(); % remove all values associated with NaN
 
-setnames=getSetNames(GPSpoints);
-% mask = strcmp(GPSpoints{:,2}, setnames{i});
-
-% setnames=getSetNames(GPSpoints);
 % Link Img filename to survey set number
 INDvalues=unique(minIND);
 INDvalues(isnan(INDvalues))=[];
@@ -154,26 +154,29 @@ for i=1:length(INDvalues)
 
     mask = minIND== INDvalues(i);
     maskedIndices = find(mask); 
-    [shortestDif,localIDX]=min(dif(maskedIndices));
+    [DifTimes(i),localIDX]=min(dif(maskedIndices));
     linkedIDX=maskedIndices(localIDX);
 
     SetMask=GPSpoints.Code(linkedIDX); % Find the set# of associated min value
     % Apply filename to all of that set#
     GPSpoints.FileIDX(GPSpoints.Code==SetMask)=repmat(files.name(INDvalues(i)),length(GPSpoints.FileIDX(GPSpoints.Code==SetMask)),1);
 end
+disp("Difference between last GPS time and image capture time:")
+disp(DifTimes);
 
+% Clean up
+clear i dif INDvalues filemask linkedIDX localIDX mask maskedIndicies minIND numpoints SetMask timediff maskedIndices
 %% Get UV coordinates from relevant GPS data
 
-hFig = gps_map_gui(UserPrefs, GPSpoints);  % Get figure handle
-uiwait(hFig);  % Wait until the GUI resumes or is closed
+hFig = gps_map_gui(UserPrefs, GPSpoints, FullCamDB);  % Get figure handle
+% uiwait(hFig);  % Wait until the GUI resumes or is closed
 
 %% Generate Cam pose based on the GPS points
 disp("GUI closed. Resuming main script...");
-CPGDB=readCPG_CamDatabase();
 
 % do more actions (like load in the saved data)
 outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
-[pose, xyzGCP] = EstimateCameraPose(CPGDB.Seacliff.Cam2.D20250122T220000Z,GPSpoints(outputmask,:)); %WIP TEMP get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
+[pose, xyzGCP] = EstimateCameraPose(FullCamDB.Seacliff.Cam2.D20250122T220000Z,GPSpoints(outputmask,:)); %WIP TEMP get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
 
 [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CameraDB,UserPrefs.CamSN);
 
@@ -183,7 +186,6 @@ icp=readDB.icp;
 icp = makeRadialDistortion(icp);
 icp = makeTangentialDistortion(icp);
         
-%%
 betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
 
 %%
@@ -199,8 +201,7 @@ betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints
 %}
 
 %% Pick Camera From Database
-function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase(path_to_CPG_CamDatabase_folder)
-    addpath(genpath(path_to_CPG_CamDatabase_folder));
+function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase()
     CameraOptionsTable=readCPG_CamDatabase(format="searchtable");
     CameraOptionsTable.Date=[]; % remove date for display purposes
     CameraOptionsTable.Fieldsite=char(CameraOptionsTable.Fieldsite); % convert to char
@@ -251,12 +252,11 @@ function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase(path_to_CPG_CamDat
     end
 end
 
-function [searchKeyoption,rowIDX]=PickCamIntrinsicsDate(path_to_CPG_CamDatabase_folder,CamSerialNumber)
-    addpath(genpath(path_to_CPG_CamDatabase_folder));
+function [searchKeyoption,rowIDX]=PickCamIntrinsicsDate(CamSerialNumber)
     CamDBread=readCPG_CamDatabase(CamSN=CamSerialNumber,Format="searchtable");
     dateArray = CamDBread.Date{:};
     DateOptionsTable = table(dateArray', 'VariableNames', {'Date'});
-    DateOptionsTable.Date = datestr(DateOptionsTable.Date, 'yyyymmddThhMMssZ');  % or use any format you like
+    DateOptionsTable.Date = strcat('D',datestr(DateOptionsTable.Date, 'yyyymmddThhMMssZ'));  % or use any format you like
     DateOptionsTable.Checkbox=false(height(DateOptionsTable),1); % add checkbox for user selection
 
     Title = 'Pick Intrinsics from a GCP date';
@@ -292,7 +292,7 @@ function [searchKeyoption,rowIDX]=PickCamIntrinsicsDate(path_to_CPG_CamDatabase_
             error('Please select only 1 camera!');
         else
             rowIDX = find(lastCol, 1); % Find the first row where true appears
-            searchKeyoption=strcat(answers.Table{rowIDX, 1},"Z"); % Extract the 2nd column value (CamSN)
+            searchKeyoption=answers.Table{rowIDX, 1}; % Extract the 2nd column value (CamSN)
         end
     else
         error('User selected cancel!');

@@ -176,12 +176,12 @@ disp("GUI closed. Resuming main script...");
 
 % do more actions (like load in the saved data)
 outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
-[pose, xyzGCP] = EstimateCameraPose(FullCamDB.Seacliff.Cam2.D20250122T220000Z,GPSpoints(outputmask,:)); %WIP TEMP get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
+[pose, xyzGCP] = EstimateCameraPose(FullCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:)); %WIP TEMP get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
 
-[UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CameraDB,UserPrefs.CamSN);
+% [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CameraDB,UserPrefs.CamSN);
 
 % Generate ICP (Internal Camera Parameters [Intrinsics]) based on a previous survey
-readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=UserPrefs.DateofICP,format="compact");
+readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=string(UserPrefs.DateofICP(2:end)),format="compact");
 icp=readDB.icp;
 icp = makeRadialDistortion(icp);
 icp = makeTangentialDistortion(icp);

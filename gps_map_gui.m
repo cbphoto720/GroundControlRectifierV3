@@ -44,6 +44,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
        % Initialize the current index tracker for setnames
     setIDX = 1;
     app.isPickingGCP = false;  % Set state sp that clicking on the image will not select A GCP yet
+    app.DisplayProjection = false; % flag to turn of rectified coordinates
     app.gcpIDX=1; % IDX for individual GPS points within the set (for UV-picking)
 
     app.gcpHighlightMarker = [];  % Holds handles to GCP scatter plot on IMGaxes
@@ -268,10 +269,12 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
             10, [240, 36, 209]/255, 'filled', 'o', 'Tag', 'GCPscatter'); % Pink color
         
         % Plot rectified image U V projections
-        PROJECTIONpoints_GCPplot=GPSpoints(GPSpoints.RECTIFYu1~=0,:);
-        for i=1:height(PROJECTIONpoints_GCPplot)
-            scatter(app.IMGaxes, GPSpoints.RECTIFYu1(i), GPSpoints.RECTIFYv1(i), ...
-                    20, [252, 86, 3]/255, 'o', 'Tag', 'GCPscatter'); % Orange color
+        if app.DisplayProjection
+            PROJECTIONpoints_GCPplot=GPSpoints(GPSpoints.RECTIFYu1~=0,:);
+            for i=1:height(PROJECTIONpoints_GCPplot)
+                scatter(app.IMGaxes, GPSpoints.RECTIFYu1(i), GPSpoints.RECTIFYv1(i), ...
+                        20, [252, 86, 3]/255, 'o', 'Tag', 'GCPscatter'); % Orange color
+            end
         end
 
         hold(app.IMGaxes, 'off');
@@ -328,10 +331,11 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     end
 
     function CalculateCallback()
+        app.DisplayProjection = true;
         outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
         [pose, xyzGCP] = EstimateCameraPose(FullCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:));
 
-        % Generate ICP (Internal Camera Parameters [Intrinsics]) based on a previous survey
+        % Generate ICP (Internal Camera Parameters [Intrinsics])
         readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=string(UserPrefs.DateofICP(2:end)),format="compact");
         icp=readDB.icp;
         icp = makeRadialDistortion(icp);
@@ -429,6 +433,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
 
     function PickGCPcallback
         app.isPickingGCP = ~app.isPickingGCP;  % Set state
+        app.DisplayProjection = false;
         if app.isPickingGCP % Button pressed
             app.PickGCP.BackgroundColor = '#f024d1';
         else % Button de-pressed

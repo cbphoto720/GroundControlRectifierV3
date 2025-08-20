@@ -573,15 +573,50 @@ icp = makeTangentialDistortion(icp);
 
 betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
 %% Use betaOUT to rectify!
-[U, V] = meshgrid(0:icp.NU-1, 0:icp.NV-1);  %find U, V coordinates
+% [U, V] = meshgrid(0:icp.NU-1, 0:icp.NV-1);  %find U, V coordinates
+
+k = 4;  % scale factor: MUST BE EVENLY DIVISABLE BY icp.Nu and icp.NV (1, 2, 4, 8)
+
+Uvals = repelem(0:k:(k*(icp.NU/k - 1)), k);   % U axis with repeats
+Vvals = repelem(0:k:(k*(icp.NV/k - 1)), k);   % V axis with repeats
+[U, V] = meshgrid(Uvals, Vvals);
+
 [Xa, Ya, ~] = getXYZfromUV(U, V, icp, betaOUT, 0, '-z');    %find FRF X, Y coordinates
+
+function M_small = compressmatrix(M, krow, kcol)
+    % Collapse a matrix where values repeat in blocks of krow × kcol
+    % Example: krow=2, kcol=2 for your case
+    
+    % Get original size
+    [nr, nc] = size(M);
+    
+    % Trim to multiples of block size
+    nr_trim = floor(nr/krow)*krow;
+    nc_trim = floor(nc/kcol)*kcol;
+    M = M(1:nr_trim, 1:nc_trim);
+
+    % New collapsed size
+    nr_new = nr_trim / krow;
+    nc_new = nc_trim / kcol;
+
+    % Reshape into 4D: (krow, nr_new, kcol, nc_new)
+    M = reshape(M, krow, nr_new, kcol, nc_new);
+
+    % Take the first element of each block (all values in block are equal)
+    M_small = squeeze(M(1,:,1,:));
+end
 
 ocean = imread('\\reefbreak.ucsd.edu\camera\Seacliff\Calibration\20250508\usable-images\Seacliff_21217396_1746729385681.tif');
 ocean = double(rgb2gray(ocean));
 
+% Compress the grid and image for better performance`
+Xab=compressmatrix(Xa,k,k);
+Yab=compressmatrix(Ya,k,k);
+oceanb=compressmatrix(ocean,k,k);
+
 figure
 hold on
-view = pcolor(Xa,Ya,ocean);
+view = pcolor(Xab,Yab,oceanb);
 set(view,'EdgeColor','none');
 
 colormap('gray')

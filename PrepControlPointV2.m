@@ -9,11 +9,12 @@
                 |_|                                                                             
 
 This program was created to streamline the process of rectifying camera
-station images with control targets from an iG8 survey.  This program is
-designed to work with PickControlPointV3, which is the interface for doing 
-the rectifying.  Here, we will prepare a set of images to import into the 
-PickControlPoint software, as well as generate the necessary files to link 
-the coordinates with the items on screen.  
+station images with control targets from an iG8 survey.  This is a standalone 
+GUI that will produce Beta parameters that can be saved to the
+CPG_camDatabase.  The Beta parameters are calculated with an initial guess
+and iG8 locations, this process is not perfect and requires the user to be
+vigilent in correcting uncertainties that are too large.
+
 
 ᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜
 
@@ -29,28 +30,24 @@ Inputs{
 - UsableIMGS folder (contains .tif) =   An image set is ~30 seconds of images from the  camera station.  
                                         This is done to avoid beachgoers obscuring the targets.  Someone needs to 
                                         manually go into each image set and pick 1 frame where all GCPs are visible.
-                                        For each image set, there needs to be **1 file** that this software uses to
-                                        generate the required copies.  All usable images are named with the camera
+                                        For each image set, there needs to be **1 file**.  All usable images are named with the camera
                                         serial number, so 1 folder can contain images from multiple cameras, but no
                                         duplicate sets.
+- the CPG_CameraDatabase            =   The CPG camera database that contains an "empty" entry for the camera you want to correct.  
+        --> a survey date with computed Intrinsics.
+        --> everything else will be populated with this program.
 }
 
 Outputs{
     **All outputs will fall into a defined folder
 
-- [YYYYMMDD]Survey.llz              =    A data file of GPS points and local
-                                    coordinates based off of the CAMERA's GPS position
-- [YYYYMMDD]UTCimgSets.utc          =    Fake timing information generated to spoof PickControlPoint
-                                    into assigning the correct order of image sets for rectification
-- [YYYYMMDD]UTCimgSets_[IMG #].tif  =    Images will be copied into this naming structure for use in the 
-                                    PickControlPoint.  There will be duplicate images depending on 
-                                    the number of ground control targets in view
-- CamExtrinsicEst.txt               =   A very rough guess at the local Pitch, Roll, Azimuth of the camera.  
-                                    (The GPS position of the camera is the local survey Origin)
+- Data to populate the CPG_CamDatabase
+        --> Beta Parameters (to run future rectifications)
+        --> iG8 points with pixel U, V coordinates
 }
 ᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜
 
-Credit to Levi Gorrell for PickControlPoint
+Credit to Levi Gorrell for PickControlPoint and rectification code
 Credit to Crameri, F. (2018). Scientific colour maps (hawaiiS.txt)
 Credit to Kesh Ikuma for inputsdlg Enhance Input Dialog Box
 Credit to Martin Koch & Alec Hoyland for developing Matlab yaml
@@ -58,7 +55,7 @@ Credit to Martin Koch & Alec Hoyland for developing Matlab yaml
 Created by Carson Black on 20240212.
 %}
 
-%% Ask nicely before deleting
+%% Clear all variables before starting
 fig = uifigure;
 msg = "About to wipe all variables! Are you sure you want to continue?";
 title = "Start Program";
@@ -125,7 +122,6 @@ files=struct2table(files);
 files.datetime=datetime(files.datenum,'ConvertFrom','datenum'); % Create datetime column
 
 %
-%WIP - Temporary until Filename is added to CPG_CamDatabase
 CameraDBentry=readCPG_CamDatabase(format="searchtable", CamSN=UserPrefs.CamSN);
 if contains(CameraDBentry.Fieldsite, "Seacliff")
     filemask=contains(files.name, strcat("Seacliff_",string(CameraDBentry.CamSN)));
@@ -172,21 +168,21 @@ hFig = gps_map_gui(UserPrefs, GPSpoints, FullCamDB);  % Get figure handle
 % uiwait(hFig);  % Wait until the GUI resumes or is closed
 
 %% Generate Cam pose based on the GPS points
-disp("GUI closed. Resuming main script...");
-
-% do more actions (like load in the saved data)
-outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
-[pose, xyzGCP] = EstimateCameraPose(FullCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:)); %WIP TEMP get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
-
-% [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CameraDB,UserPrefs.CamSN);
-
-% Generate ICP (Internal Camera Parameters [Intrinsics]) based on a previous survey
-readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=string(UserPrefs.DateofICP(2:end)),format="compact");
-icp=readDB.icp;
-icp = makeRadialDistortion(icp);
-icp = makeTangentialDistortion(icp);
-        
-betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
+% disp("GUI closed. Resuming main script...");
+% 
+% % do more actions (like load in the saved data)
+% outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
+% [pose, xyzGCP] = EstimateCameraPose(FullCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:)); %WIP TEMP get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
+% 
+% % [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CameraDB,UserPrefs.CamSN);
+% 
+% % Generate ICP (Internal Camera Parameters [Intrinsics]) based on a previous survey
+% readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=string(UserPrefs.DateofICP(2:end)),format="compact");
+% icp=readDB.icp;
+% icp = makeRadialDistortion(icp);
+% icp = makeTangentialDistortion(icp);
+% 
+% betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
 
 %%
 %{ 

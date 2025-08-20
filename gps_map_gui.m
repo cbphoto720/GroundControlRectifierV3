@@ -22,10 +22,17 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     app.MainGridLayout.RowHeight = {'4x', '1x'};
     app.MainGridLayout.ColumnWidth = {'1x', '1x'};
 
+    % Create Left tab group
+    app.Lefttabgroup = uitabgroup(app.MainGridLayout);
+    app.Lefttabgroup.Layout.Row = 1;
+    app.Lefttabgroup.Layout.Column = 1;
+    app.tab1 = uitab(app.Lefttabgroup,"Title","GoogleMap");
+    app.tab2 = uitab(app.Lefttabgroup,"Title","Rectification");
+
     % Create UIAxes (left side for GPS map)
-    app.UIAxes = geoaxes(app.MainGridLayout);
-    app.UIAxes.Layout.Row = 1;
-    app.UIAxes.Layout.Column = 1;
+    app.UIAxes = geoaxes(app.tab1);
+    % app.UIAxes.Layout.Row = 1;
+    % app.UIAxes.Layout.Column = 1;
     hold(app.UIAxes, 'on'); % Allow multiple drawings
     title(app.UIAxes, 'GPS Map');
     

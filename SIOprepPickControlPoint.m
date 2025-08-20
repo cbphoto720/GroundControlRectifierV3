@@ -656,3 +656,7 @@ function diffReport = compareStructs(struct1, struct2)
 end
 
 compareStructs(UserPrefsCORRECT,UserPrefs)
+
+%%
+
+GPSpointsTEMP=importGPShandheld("20250614_DelMar17_GCPs.txt")

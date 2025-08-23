@@ -37,24 +37,14 @@ opts.VariableTypes = ["double", "double", "double", "double", "string", "double"
 opts.ExtraColumnsRule = "ignore";
 opts.EmptyLineRule = "read";
 
+
 % Specify variable properties
 opts = setvaropts(opts, ["Code", "DATE", "TIME", "RODHGT"], "WhitespaceRule", "preserve");
 opts = setvaropts(opts, ["Code", "STATUS", "DATE", "TIME", "RODHGT"], "EmptyFieldRule", "auto");
 opts = setvaropts(opts, ["HSDV", "VSDV", "SATS", "AGE", "PDOP", "HDOP", "VDOP", "TDOP", "GDOP", "NSDV", "ESDV"], "TrimNonNumeric", true);
-opts = setvaropts(opts, ["HSDV", "VSDV", "SATS", "AGE", "PDOP", "HDOP", "VDOP", "TDOP", "GDOP", "NSDV", "ESDV"], "ThousandsSeparator", ",");
+% opts = setvaropts(opts, ["HSDV", "VSDV", "SATS", "AGE", "PDOP", "HDOP", "VDOP", "TDOP", "GDOP", "NSDV", "ESDV"], "ThousandsSeparator", ",");
 
 % Import the data
 handheldGPSpoints = readtable(filename, opts);
-
-tableshape=size(handheldGPSpoints);
-
-for i=1:tableshape(1)
-    if(handheldGPSpoints.DATE{i}(1:5)=='DATE:')
-        handheldGPSpoints.DATE{i}(1:5)=[];
-    end
-    if(handheldGPSpoints.TIME{i}(1:5)=='TIME:')
-        handheldGPSpoints.TIME{i}(1:5)=[];
-    end
-end
 
 end

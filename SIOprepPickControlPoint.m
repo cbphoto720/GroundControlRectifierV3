@@ -660,3 +660,19 @@ compareStructs(UserPrefsCORRECT,UserPrefs)
 %%
 
 GPSpointsTEMP=importGPShandheld("20250614_DelMar17_GCPs.txt")
+
+%%
+file="20250614_DelMar17_GCPs.txt";
+    % Open file
+    fid = fopen(file,'r');
+    if fid == -1
+        error('Could not open file: %s', file);
+    end
+    
+    % Read first line only
+    firstLine = fgetl(fid)
+    fclose(fid);
+    
+    % If it contains letters, assume it's a header
+    hasHeader = isempty(regexp(firstLine, '\d', 'once'))
+    

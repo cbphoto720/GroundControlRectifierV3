@@ -105,7 +105,12 @@ end
 clear cancelled DefaultOpsFile
 
 %% Pick Camera from database
-GPSpoints = importGPSpoints(UserPrefs.GPSSurveyFile);
+GPSpoints = importiG8points(UserPrefs.GPSSurveyFile);
+GPSshape=size(GPSpoints);
+if GPSshape(2)==23 % Check GPS format
+    GPSpoints = ConvertGPShandheldtoGDrive(GPSpoints);
+end
+clear GPSshape
 
 [path_to_CPG_CamDatabase_folder, ~, ~] = fileparts(UserPrefs.CameraDB);
 addpath(genpath(path_to_CPG_CamDatabase_folder));
@@ -165,7 +170,7 @@ clear i dif INDvalues filemask linkedIDX localIDX mask maskedIndicies minIND num
 %% Get UV coordinates from relevant GPS data
 
 hFig = gps_map_gui(UserPrefs, GPSpoints, FullCamDB);  % Get figure handle
-% uiwait(hFig);  % Wait until the GUI resumes or is closed
+uiwait(hFig);  % Wait until the GUI resumes or is closedy
 
 %% Generate Cam pose based on the GPS points
 % disp("GUI closed. Resuming main script...");

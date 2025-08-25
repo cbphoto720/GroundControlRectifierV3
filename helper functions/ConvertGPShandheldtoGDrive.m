@@ -8,7 +8,7 @@ function LandStarGPSformat = ConvertGPShandheldtoGDrive(handheldGPSVariable)
         {'Name','Code','Northings','Eastings','Elevation','Longitude','Latitude','H', ...
          'RODHGT','STATUS','SATS','PDOP','HSDV','VSDV','TIME','DATE'}, ...
         {'Name','Code','Northings','Eastings','Elevation','Longitude','Latitude','H', ...
-         'Antenna_offset','Solution','Satellites','PDOP','Horizontal_error','Vertical_error','Time','Date'} );
+         'AntennaHeight','SolutionUsed','Satellites','PDOP','HorizontalError','VerticalError','Time','Date'} );
 
     % Apply renaming if fields exist
     oldNames = handheldGPSVariable.Properties.VariableNames;
@@ -39,20 +39,21 @@ function LandStarGPSformat = ConvertGPShandheldtoGDrive(handheldGPSVariable)
     end
 
     % Fix "Antenna offset"
-    if ismember({'Antenna_offset'}, handheldGPSVariable.Properties.VariableNames)
-        handheldGPSVariable.Antenna_offset=strrep(handheldGPSVariable.Antenna_offset, 'RODHGT2:', '');
+    if ismember({'AntennaHeight'}, handheldGPSVariable.Properties.VariableNames)
+        handheldGPSVariable.AntennaHeight=strrep(handheldGPSVariable.AntennaHeight, 'RODHGT2:', '');
+        handheldGPSVariable=convertvars(handheldGPSVariable,{'AntennaHeight'},'double');
     end
     % Fix "Solution"
-    if ismember({'Solution'}, handheldGPSVariable.Properties.VariableNames)
-        oldCats = categories(handheldGPSVariable.Solution);                         % Get existing categories
+    if ismember({'SolutionUsed'}, handheldGPSVariable.Properties.VariableNames)
+        oldCats = categories(handheldGPSVariable.SolutionUsed);                         % Get existing categories
         newCats = regexprep(oldCats, '^STATUS:', '');           % Remove "STATUS:" prefix
-        handheldGPSVariable.Solution = renamecats(handheldGPSVariable.Solution, oldCats, newCats);      % Rename categories
+        handheldGPSVariable.SolutionUsed = renamecats(handheldGPSVariable.SolutionUsed, oldCats, newCats);      % Rename categories
     end
     
     % Ensure all requested new headers exist
     newHeaders = ["Name", "Code", "Northings", "Eastings", "Elevation", ...
-                  "Longitude", "Latitude", "H", "Antenna_offset", "Solution", ...
-                  "Satellites", "PDOP", "Horizontal_error", "Vertical_error", ...
+                  "Longitude", "Latitude", "H", "AntennaHeight", "SolutionUsed", ...
+                  "Satellites", "PDOP", "HorizontalError", "VerticalError", ...
                   "Time", "HRMS", "VRMS"];
     
     % Add missing columns as NaN / empty

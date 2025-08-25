@@ -1,11 +1,12 @@
 function GPSpoints = importiG8points(filename,options)
 % Import ig8 data as a .txt file from Carlson Survey handheld (export ASCII) 
 % or the LandStar app on android (google drive)
-    % use LandStarFormat="Long" to import more variables from the gDrive
-    % (default is LandStarFormat="Short")
+    % use Format="Long" to import more variables from the gDrive
+    % (default is Format="Short")
     arguments
         filename (1,1) string {mustBeText}
-        options.LandStarFormat (1,1) string {mustBeText} = getDefaultOptions().LandStarFormat
+        options.Format (1,1) string {mustBeText} = getDefaultOptions().Format
+        options.ForceFileType (1,1) string {mustBeText} = getDefaultOptions().ForceFileType
     end
     %% Input handling
     
@@ -40,7 +41,7 @@ function GPSpoints = importiG8points(filename,options)
         opts.SelectedVariableNames = opts.VariableNames;
         opts.VariableTypes = ["double", "string", "string", "string", "double", "string", "string", "double", "double", "categorical", "double", "double", "double", "double", "datetime", "double", "double", "categorical", "double", "double", "string", "double", "double", "double", "double", "double", "double", "string", "string"];
 
-        if strcmp(options.LandStarFormat,"Short")
+        if strcmp(options.Format,"Short")
             opts.SelectedVariableNames = ["Name", "Code", "Northings", "Eastings", "Elevation", "Longitude", "Latitude", "H", "AntennaHeight", "SolutionUsed", "Satellites", "PDOP", "HorizontalError", "VerticalError", "StartTime", "HRMS", "VRMS"];
         end
     
@@ -55,7 +56,7 @@ function GPSpoints = importiG8points(filename,options)
         opts.SelectedVariableNames = opts.VariableNames;
         opts.VariableTypes = ["double", "string", "string", "double", "string", "string", "double", "double", "categorical", "double", "double", "double", "double", "datetime", "double", "double", "categorical", "double", "double", "string", "double", "double", "double", "double", "double", "double", "string", "string"];
         
-        if strcmp(options.LandStarFormat,"Short")
+        if strcmp(options.Format,"Short")
             % this solution is ugly because the "Code" column gets added
             % later in a check.  But since these are IMPORT options, it is
             % not included here
@@ -67,11 +68,11 @@ function GPSpoints = importiG8points(filename,options)
         opts = setvaropts(opts, ["Northings", "Eastings", "SolutionUsed", "Status", "PDOP_1", "Date", "Time"], "EmptyFieldRule", "auto");
         opts = setvaropts(opts, "StartTime", "InputFormat", "yyyy-MM-dd HH:mm:ss", "DatetimeFormat", "preserveinput");
         opts = setvaropts(opts, ["HRMS", "VRMS", "SATS", "AGE", "HDOP", "VDOP", "TDOP", "GDOP", "NRMS", "ERMS"], "TrimNonNumeric", true);
-    elseif tableshape(2)==17
+    elseif or(tableshape(2)==17, tableshape(2)==15)
         filetype="LandStar-Short";
         opts.VariableNames = ["Name", "Code", "Northings", "Eastings", "Elevation", "Longitude", "Latitude", "H", "AntennaHeight", "SolutionUsed", "Satellites", "PDOP", "HorizontalError", "VerticalError", "Time", "HRMS", "VRMS"];
         opts.SelectedVariableNames = opts.VariableNames;
-        opts.VariableTypes = ["double", "string", "double", "double", "double", "double", "double", "double", "double", "categorical", "double", "double", "double", "double", "datetime", "double", "double"];
+        opts.VariableTypes = ["double", "string", "string", "string", "double", "string", "string", "double", "double", "categorical", "double", "double", "double", "double", "datetime", "double", "double"];
 
         % Specify variable properties
         % opts = setvaropts(opts, ["Var18", "Var19", "Var20", "Var21", "Var22", "Var23", "Var24", "Var25", "Var26", "Var27", "Var28", "Var29"], "WhitespaceRule", "preserve");
@@ -82,7 +83,7 @@ function GPSpoints = importiG8points(filename,options)
         filetype="CarlsonHandheld";
         opts.VariableNames = ["Name", "Latitude", "Longitude", "H", "Code", "Northings", "Eastings", "Elevation", "HSDV", "VSDV", "STATUS", "SATS", "AGE", "PDOP", "HDOP", "VDOP", "TDOP", "GDOP", "NSDV", "ESDV", "DATE", "TIME", "RODHGT"];
         % opts.SelectedVariableNames = opts.VariableNames;
-        opts.VariableTypes = ["double", "double", "double", "double", "string", "double", "double", "double", "double", "double", "categorical", "double", "double", "double", "double", "double", "double", "double", "double", "double", "string", "string", "string"];
+        opts.VariableTypes = ["double", "string", "string", "double", "string", "string", "string", "double", "double", "double", "categorical", "double", "double", "double", "double", "double", "double", "double", "double", "double", "string", "string", "string"];
     
         % Specify variable properties
         opts = setvaropts(opts, ["Code", "DATE", "TIME", "RODHGT"], "WhitespaceRule", "preserve");
@@ -101,13 +102,15 @@ function GPSpoints = importiG8points(filename,options)
     % Import the data
     GPSpoints = readtable(filename, opts);
 
+    if ~strcmp(options.ForceFileType,getDefaultOptions().ForceFileType)
+        filetype=options.ForceFileType;
+    end
     GPSpoints = addprop(GPSpoints,{'FileType'},'table');
-
     GPSpoints.Properties.CustomProperties.FileType=filetype;
     
     
     if or(filetype=="LandStar+CODE",filetype=="LandStar")
-        if strcmp(options.LandStarFormat,"Short")
+        if strcmp(options.Format,"Short")
             % Ensure all requested new headers exist
             newHeaders = ["Name", "Code", "Northings", "Eastings", "Elevation", ...
                           "Longitude", "Latitude", "H", "AntennaHeight", "SolutionUsed", ...
@@ -128,59 +131,58 @@ function GPSpoints = importiG8points(filename,options)
             % Reorder columns
             GPSpoints = GPSpoints(:, newHeaders);
         end
-
-        tableshape=size(GPSpoints);       
-        % Assign + or - Longitude
-        for i=1:tableshape(1)
-            if(GPSpoints.Longitude{i}(end)=='W')
-                GPSpoints.Longitude{i}=append('-',GPSpoints.Longitude{i});
-                GPSpoints.Longitude{i}(end)=[];
-            elseif(GPSpoints.Longitude{i}(end)=='E')
-                GPSpoints.Longitude{i}(end)=[];
-            else
-                % error('Longitude import error.  Unknown coordinate reference (define W or E by appending)')
-            end
-        end
-        
-        % Assign + or - Latitude
-        for i=1:tableshape(1)
-            if(GPSpoints.Latitude{i}(end)=='S')
-                GPSpoints.Latitude{i}=append('-',GPSpoints.Latitude{i});
-                GPSpoints.Latitude{i}(end)=[];
-            elseif(GPSpoints.Latitude{i}(end)=='N')
-                GPSpoints.Latitude{i}(end)=[];
-            else
-                % error('Latitude import error.  Unknown coordinate reference (define N or S by appending)')
-            end
-        end
-        
-        % Assign + or - Northings
-        for i=1:tableshape(1)
-            if(GPSpoints.Northings{i}(end)=='S')
-                GPSpoints.Northings{i}=append('-',GPSpoints.Northings{i});
-                GPSpoints.Northings{i}(end)=[];
-            elseif(GPSpoints.Northings{i}(end)=='N')
-                GPSpoints.Northings{i}(end)=[];
-            else
-                % error('Northings import error.  Unknown coordinate reference (define N or S by appending)')
-            end
-        end
-        
-        % Assign + or - Eastings
-        for i=1:tableshape(1)
-            if(GPSpoints.Eastings{i}(end)=='W')
-                GPSpoints.Eastings{i}=append('-',GPSpoints.Eastings{i});
-                GPSpoints.Eastings{i}(end)=[];
-            elseif(GPSpoints.Eastings{i}(end)=='E')
-                GPSpoints.Eastings{i}(end)=[];
-            else
-                % error('Eastings import error.  Unknown coordinate reference (define E or W by appending)')
-            end
-        end
-        
-        
-        GPSpoints=convertvars(GPSpoints,{'Longitude','Latitude','Northings','Eastings'},'double');
     end
+
+    % Convert Northings/Eastings and Lat/Lon to double
+    tableshape=size(GPSpoints);       
+    % Assign + or - Longitude
+    for i=1:tableshape(1)
+        if(GPSpoints.Longitude{i}(end)=='W')
+            GPSpoints.Longitude{i}=append('-',GPSpoints.Longitude{i});
+            GPSpoints.Longitude{i}(end)=[];
+        elseif(GPSpoints.Longitude{i}(end)=='E')
+            GPSpoints.Longitude{i}(end)=[];
+        else
+            % error('Longitude import error.  Unknown coordinate reference (define W or E by appending)')
+        end
+    end
+    
+    % Assign + or - Latitude
+    for i=1:tableshape(1)
+        if(GPSpoints.Latitude{i}(end)=='S')
+            GPSpoints.Latitude{i}=append('-',GPSpoints.Latitude{i});
+            GPSpoints.Latitude{i}(end)=[];
+        elseif(GPSpoints.Latitude{i}(end)=='N')
+            GPSpoints.Latitude{i}(end)=[];
+        else
+            % error('Latitude import error.  Unknown coordinate reference (define N or S by appending)')
+        end
+    end
+    
+    % Assign + or - Northings
+    for i=1:tableshape(1)
+        if(GPSpoints.Northings{i}(end)=='S')
+            GPSpoints.Northings{i}=append('-',GPSpoints.Northings{i});
+            GPSpoints.Northings{i}(end)=[];
+        elseif(GPSpoints.Northings{i}(end)=='N')
+            GPSpoints.Northings{i}(end)=[];
+        else
+            % error('Northings import error.  Unknown coordinate reference (define N or S by appending)')
+        end
+    end
+    
+    % Assign + or - Eastings
+    for i=1:tableshape(1)
+        if(GPSpoints.Eastings{i}(end)=='W')
+            GPSpoints.Eastings{i}=append('-',GPSpoints.Eastings{i});
+            GPSpoints.Eastings{i}(end)=[];
+        elseif(GPSpoints.Eastings{i}(end)=='E')
+            GPSpoints.Eastings{i}(end)=[];
+        else
+            % error('Eastings import error.  Unknown coordinate reference (define E or W by appending)')
+        end
+    end
+    GPSpoints=convertvars(GPSpoints,{'Longitude','Latitude','Northings','Eastings'},'double');
 
 end
 
@@ -190,7 +192,8 @@ end
 
 function defaults = getDefaultOptions()
     defaults = struct( ...
-        'LandStarFormat', "Short" ...
+        'Format', "Short", ...
+        'ForceFileType',''...
         );
 end
 

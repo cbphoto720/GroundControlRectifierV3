@@ -6,12 +6,12 @@
 %% Options
 load("hawaiiS.txt"); % Load color map
 
-filename="20250508_Seacliff_TargetGCPs.txt";
+filename="20250826_SeacliffDrone.txt";
 
 Addlabels=true; % (boolean) Add labels to each point based on Code description
 drawcircles=0; % (m) Draw circles around each point set to "0" meters to turn off
 
-GPSpoints=importGPSpoints(filename);
+GPSpoints=importiG8points(filename);
 %% Generate Map
 
 % Create main UI figure
@@ -52,7 +52,7 @@ if Addlabels
     % Randomize the label direction by creating a unit vector.
     vec=-1+(1+1)*rand(length(a),2);
     dir=vec./(((vec(:,1).^2)+(vec(:,2).^2)).^(1/2));
-    scale=0.000002; % offset text from point
+    scale=0.000004; % offset text from point
     % dir(:)=0; % turn ON randomization by commenting out this line
     offsetx=-0.0000004+dir(:,1)*scale; % offset text on the point
     offsety=-0.00000008+dir(:,2)*scale; % offset text on the point

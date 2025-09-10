@@ -121,7 +121,12 @@ addpath(genpath(path_to_CPG_CamDatabase_folder));
 FullCamDB=readCPG_CamDatabase("CamSN",UserPrefs.CamSN);
 
 % Find files in usable img folder 
-files = dir(fullfile(UserPrefs.UsableIMGsFolder,[filesep,'*.tif']));
+files_tif  = dir(fullfile(UserPrefs.UsableIMGsFolder, '*.tif'));
+files_TIF  = dir(fullfile(UserPrefs.UsableIMGsFolder, '*.TIF'));
+files_jpg  = dir(fullfile(UserPrefs.UsableIMGsFolder, '*.jpg'));
+files_JPG  = dir(fullfile(UserPrefs.UsableIMGsFolder, '*.JPG'));
+files = [files_tif; files_TIF; files_jpg; files_JPG];
+clear files_tif files_TIF files_jpg files_JPG
 files=struct2table(files);
 files.datetime=datetime(files.datenum,'ConvertFrom','datenum'); % Create datetime column
 
@@ -129,6 +134,8 @@ files.datetime=datetime(files.datenum,'ConvertFrom','datenum'); % Create datetim
 CameraDBentry=readCPG_CamDatabase(format="searchtable", CamSN=UserPrefs.CamSN);
 if contains(CameraDBentry.Fieldsite, "Seacliff")
     filemask=contains(files.name, strcat("Seacliff_",string(CameraDBentry.CamSN)));
+elseif contains(CameraDBentry.Fieldsite, "Ponto")
+    filemask=contains(files.name, CameraDBentry.CamID);
 else
     error(['Could not find any files in usable-imgs folder matching your selected camera SN.\n' ...
         'Filename: %s'],'') %WIP improve this error message to list filename once data is available in CPG_CamDatabase
@@ -136,6 +143,15 @@ end
 files=files(filemask,:); % Remove files that are captured from different cameras
 
 % Calculate closest survey date with captured image date
+if all(abs(files.datetime(1)-files.datetime(:))<=seconds(10))
+    % IMG datetimes are not true values, we need to calculate capture time
+    % based off the filename:
+    files.datetime= NaT(size(files.datetime));
+    for i=1:size(files,1)
+        files.datetime(i)=extractDatetimeFromFilename(files.name{i});
+    end
+end
+
 numpoints=length(GPSpoints.Time);
 dif=seconds(zeros(numpoints,1));
 minIND=zeros(numpoints,1);
@@ -297,4 +313,46 @@ function [searchKeyoption,rowIDX]=PickCamIntrinsicsDate(CamSerialNumber)
     else
         error('User selected cancel!');
     end
+end
+
+function dt = extractDatetimeFromFilename(filename)
+    % Extract datetime from filename string
+    % Supports:
+    %   - Epoch timestamps (10-digit seconds or 13-digit milliseconds)
+    %   - Formatted timestamps like yyyy-MM-dd_HH-mm-ss
+    %
+    % Output:
+    %   dt = datetime object in UTC
+
+    % --- 1. Try finding epoch timestamp (13 or 10 digits) ---
+    tokens = regexp(filename, '\d{13}|\d{10}', 'match');
+    if ~isempty(tokens)
+        % Take the first candidate
+        numStr = tokens{1};
+        epochVal = str2double(numStr);
+
+        % Convert to seconds if it's in milliseconds
+        if length(numStr) == 13
+            epochVal = epochVal / 1000;
+        end
+
+        % Convert to datetime in UTC
+        dt = datetime(epochVal, 'ConvertFrom','posixtime');
+        return
+    end
+
+    % --- 2. Try formatted timestamp yyyy-MM-dd_HH-mm-ss ---
+    tokens = regexp(filename, '\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}', 'match');
+    if ~isempty(tokens)
+        try
+            dt = datetime(tokens{1}, 'InputFormat','yyyy-MM-dd_HH-mm-ss');
+            return
+        catch
+            % If parsing fails, keep going to error
+        end
+    end
+
+    % --- 3. If nothing worked, throw an error ---
+    error('extractDatetimeFromFilename:NoDateFound', ...
+          'Could not find a valid datetime in filename: %s', filename);
 end

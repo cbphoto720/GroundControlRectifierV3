@@ -29,13 +29,18 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     app.tab1 = uitab(app.Lefttabgroup,"Title","GoogleMap");
     app.tab2 = uitab(app.Lefttabgroup,"Title","Rectification");
 
-    % Create UIAxes (left side for GPS map)
-    app.UIAxes = geoaxes(app.tab1);
+    % Create EarthViewAxes (left side for GPS map)
+    app.EarthViewAxes = geoaxes(app.tab1);
     % app.UIAxes.Layout.Row = 1;
     % app.UIAxes.Layout.Column = 1;
-    hold(app.UIAxes, 'on'); % Allow multiple drawings
-    title(app.UIAxes, 'GPS Map');
+    hold(app.EarthViewAxes, 'on'); % Allow multiple drawings
+    title(app.EarthViewAxes, 'GPS Map');
+
+    % Create RectificationAxes
+    app.RectificationAxes=axes(app.tab2);
+    title(app.RectificationAxes, 'Rectification Map');
     
+
     %% Variables
 
     GPSpoints.ImageU=zeros(height(GPSpoints),1);
@@ -59,25 +64,25 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     'VariableNames', {'PointNum', 'X', 'Y', 'Handle'});
 
     % Plot all GPS points
-    geobasemap(app.UIAxes, "satellite");
+    geobasemap(app.EarthViewAxes, "satellite");
     for i = 1:NUM_IMGsets
         mask = strcmp(GPSpoints{:,2}, setnames{i});
-        geoscatter(app.UIAxes, GPSpoints.Latitude(mask), GPSpoints.Longitude(mask), ...
+        geoscatter(app.EarthViewAxes, GPSpoints.Latitude(mask), GPSpoints.Longitude(mask), ...
                    36, hawaiiS(mod(i-1, 100) + 1, :), "filled"); % Wrap colors properly
     end
 
     % Overlay for highlighted points
-    highlightSAVEDGCPPlot = geoscatter(app.UIAxes, NaN, NaN, 100,'pentagram','filled', 'MarkerFaceColor', '#000000'); % Initially empty
-    highlightSETPlot = geoscatter(app.UIAxes, NaN, NaN, 100, 'r', 'pentagram','filled'); % Initially empty
-    highlightSINGLEPlot = geoscatter(app.UIAxes, NaN, NaN, 100,'pentagram','filled', 'MarkerFaceColor', '#f024d1'); % Initially empty
+    highlightSAVEDGCPPlot = geoscatter(app.EarthViewAxes, NaN, NaN, 100,'pentagram','filled', 'MarkerFaceColor', '#000000'); % Initially empty
+    highlightSETPlot = geoscatter(app.EarthViewAxes, NaN, NaN, 100, 'r', 'pentagram','filled'); % Initially empty
+    highlightSINGLEPlot = geoscatter(app.EarthViewAxes, NaN, NaN, 100,'pentagram','filled', 'MarkerFaceColor', '#f024d1'); % Initially empty
 
     % Add Legend
-    legend(app.UIAxes, ...
+    legend(app.EarthViewAxes, ...
     [highlightSAVEDGCPPlot, highlightSETPlot, highlightSINGLEPlot], ...
     {'Saved GCP', 'Set Highlight', 'User Selection'}, ...
     'Location', 'northeast');
 
-    hold(app.UIAxes, 'off');
+    hold(app.EarthViewAxes, 'off');
 
     %% GUI Elements
 
@@ -356,6 +361,63 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         fprintf("Beta parameters:\n");
         fprintf("%16.6f",betaOUT);
         fprintf("\n");
+
+        % Print the rectification!
+        k = 4;  % scale factor: MUST BE EVENLY DIVISABLE BY icp.Nu and icp.NV (1, 2, 4, 8)
+
+        Uvals = repelem(0:k:(k*(icp.NU/k - 1)), k);   % U axis with repeats
+        Vvals = repelem(0:k:(k*(icp.NV/k - 1)), k);   % V axis with repeats
+        [U, V] = meshgrid(Uvals, Vvals);
+        
+        [Xa, Ya, ~] = getXYZfromUV(U, V, icp, betaOUT, 0, '-z');    %find FRF X, Y coordinates
+        
+        function M_small = compressmatrix(M, krow, kcol)
+            % Collapse a matrix where values repeat in blocks of krow × kcol
+            % Example: krow=2, kcol=2 for your case
+            
+            % Get original size
+            [nr, nc] = size(M);
+            
+            % Trim to multiples of block size
+            nr_trim = floor(nr/krow)*krow;
+            nc_trim = floor(nc/kcol)*kcol;
+            M = M(1:nr_trim, 1:nc_trim);
+        
+            % New collapsed size
+            nr_new = nr_trim / krow;
+            nc_new = nc_trim / kcol;
+        
+            % Reshape into 4D: (krow, nr_new, kcol, nc_new)
+            M = reshape(M, krow, nr_new, kcol, nc_new);
+        
+            % Take the first element of each block (all values in block are equal)
+            M_small = squeeze(M(1,:,1,:));
+        end
+        
+        mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
+        imgfile = GPSpoints.FileIDX(mask);
+        imgfile = imgfile(1);
+
+        ocean = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
+        ocean = double(rgb2gray(ocean));
+        
+        % Compress the grid and image for better performance`
+        Xab=compressmatrix(Xa,k,k);
+        Yab=compressmatrix(Ya,k,k);
+        oceanb=compressmatrix(ocean,k,k);
+        
+        app.RectGraph=pcolor(app.RectificationAxes, Xab,Yab,oceanb);
+        hold on
+        set(app.RectGraph,'EdgeColor','none');
+        
+        colormap(app.RectificationAxes, gray);
+        ylim([-50 150])
+        xlim([-100 100])
+        ax = gca;
+        set(app.RectGraph,'DataAspectRatio', [1 1 1]);
+        ylabel('Alongshore (m)')
+        xlabel('Cross-shore (m)')
+
         updateFullFrame()
     end
 

@@ -6,7 +6,7 @@
 %% Options
 load("hawaiiS.txt"); % Load color map
 
-filename="20250826_SeacliffDrone.txt";
+filename="\\reefbreak.ucsd.edu\camera\Seacliff\Calibration\20250508\20250508_Seacliff_TargetGCPs-SETCORRECTED.txt";
 
 Addlabels=true; % (boolean) Add labels to each point based on Code description
 drawcircles=0; % (m) Draw circles around each point set to "0" meters to turn off

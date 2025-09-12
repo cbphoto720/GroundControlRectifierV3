@@ -45,8 +45,8 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
 
     GPSpoints.ImageU=zeros(height(GPSpoints),1);
     GPSpoints.ImageV=GPSpoints.ImageU;
-    GPSpoints.RECTIFYu1=GPSpoints.ImageU;
-    GPSpoints.RECTIFYv1=GPSpoints.ImageU;
+    GPSpoints.Reprojectu1=GPSpoints.ImageU;
+    GPSpoints.Reprojectv1=GPSpoints.ImageU;
     % GPSpoints.scatterHandle=gobjects(height(GPSpoints), 1);
 
     % Get unique descriptions (setnames)
@@ -282,9 +282,9 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         
         % Plot rectified image U V projections
         if app.DisplayProjection
-            PROJECTIONpoints_GCPplot=GPSpoints(GPSpoints.RECTIFYu1~=0,:);
+            PROJECTIONpoints_GCPplot=GPSpoints(GPSpoints.Reprojectu1~=0,:);
             for i=1:height(PROJECTIONpoints_GCPplot)
-                scatter(app.IMGaxes, GPSpoints.RECTIFYu1(i), GPSpoints.RECTIFYv1(i), ...
+                scatter(app.IMGaxes, GPSpoints.Reprojectu1(i), GPSpoints.Reprojectv1(i), ...
                         20, [252, 86, 3]/255, 'o', 'Tag', 'GCPscatter'); % Orange color
             end
         end
@@ -309,6 +309,106 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         end
 
         updatePoints();
+    end
+
+    function [Rectification] = CalcRectification(icp, betaOUT, xyzGCP, k, GPSpixel_dims)
+        % k = Compression factor = 1, 2, 4, 8, 16, ... etc (for graphic performance reasons)
+        % GPSpixel_dims = [offsetx , offsety].  [2,1] is standard.  How many pixels will a GPS point highlight
+        outputmask=(GPSpoints.ImageU~=0);
+
+        Rectification=struct();
+        Rectification.k=k;
+
+        Uvals = repelem(0:k:(k*(icp.NU/k - 1)), k);   % U axis with repeats
+        Vvals = repelem(0:k:(k*(icp.NV/k - 1)), k);   % V axis with repeats
+        [U, V] = meshgrid(Uvals, Vvals);
+        
+        Rectification.Zplane=mean(xyzGCP(:,3));
+
+        [Xa, Ya, Za] = getXYZfromUV(U, V, icp, betaOUT, Rectification.Zplane, '-z');
+        
+        % Compress the grid and image for better performance`
+        Xab=compressmatrix(Xa,k,k);
+        Yab=compressmatrix(Ya,k,k);
+        
+        % Create GPS overlay:
+        Rectification.GPSsurface=compressmatrix((Rectification.Zplane-1)*ones(icp.NV,icp.NU,1),k,k); % create a surface below
+        for i=1:length(outputmask)
+            if and(GPSpoints.ImageV(outputmask(i))~=0, GPSpoints.ImageU(outputmask(i))~=0)
+               
+                Rectification.GPSsurface(round(GPSpoints.ImageV(outputmask(i))/k)-GPSpixel_dims(2):round(GPSpoints.ImageV(outputmask(i))/k)+GPSpixel_dims(2),...
+                    round(GPSpoints.ImageU(outputmask(i))/k)-GPSpixel_dims(1):round(GPSpoints.ImageU(outputmask(i))/k)+GPSpixel_dims(1))=Rectification.Zplane; %Store a group of pixels instead just a single point
+            end
+        end
+
+        % --- Calculate the error of the Projection vs the actual coordinates ---
+        % Extract (X,Y) where surface overlay hits z=0
+        mask = (Rectification.GPSsurface == 0);   % logical mask
+        Xz = Xab(mask);
+        Yz = Yab(mask);
+        Zz = Rectification.GPSsurface(mask);      % should all be 0
+        
+        surfZeroPoints = [Xz(:), Yz(:), Zz(:)];   % Mx3 list of surface z=0 points
+        
+        % Your scatter3 points (already nx3, with z=0)
+        scatterPoints = xyzGCP;
+        scatterPoints(:,3)=0; % don't calculate vertical distance
+        
+        % Calc distance
+        D = pdist2(scatterPoints, surfZeroPoints);
+        [Rectification.errors, ~] = min(D, [], 2);
+    end
+
+    function DrawRectification()
+
+        % - - - Start plotting - - -
+        % Get background img
+        mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
+        imgfile = GPSpoints.FileIDX(mask);
+        imgfile = imgfile(1);
+        ocean = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
+        ocean = double(rgb2gray(ocean));
+
+        oceanb=compressmatrix(ocean,k,k);
+
+        f=figure(k);
+        ax = axes('Parent', f); % create axes inside your figure
+        hold(ax, 'on')
+        h1 = surf(ax,Xab,Yab,zeros(size(Xab)),'Cdata',repmat(oceanb,1,1,3)/255,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
+        
+        
+        orangecolor = repmat(reshape([247 193 84]/255,1,1,3), size(Xab));
+        h2 = surf(ax,Xab,Yab,GPSoverlay_Z,'Cdata',orangecolor,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
+        shading(ax, 'flat');
+        
+        h3 = scatter3(xyzGCP(:,1),xyzGCP(:,2),zeros(1,size(xyzGCP,1)),36,"red");
+        shading(ax, 'flat');
+
+        set(ax,'DataAspectRatio', [1 1 1]);
+        ylabel('Alongshore (m)')
+        xlabel('Cross-shore (m)')
+
+        function M_small = compressmatrix(M, krow, kcol)
+            % Collapse a matrix where values repeat in blocks of krow × kcol
+            
+            % Get original size
+            [nr, nc] = size(M);
+            
+            % Trim to multiples of block size
+            nr_trim = floor(nr/krow)*krow;
+            nc_trim = floor(nc/kcol)*kcol;
+            M = M(1:nr_trim, 1:nc_trim);
+        
+            % New collapsed size
+            nr_new = nr_trim / krow;
+            nc_new = nc_trim / kcol;
+        
+            % Reshape into 4D: (krow, nr_new, kcol, nc_new)
+            M = reshape(M, krow, nr_new, kcol, nc_new);
+        
+            % Take the first element of each block (all values in block are equal)
+            M_small = squeeze(M(1,:,1,:));
+        end
     end
 
     function redrawGCPS()
@@ -355,9 +455,12 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
                 
         betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
 
+        % Fill in the U,V reprojection for the camera view
         for i=1:length(outputmask)
-            [GPSpoints.RECTIFYu1(outputmask(i)), GPSpoints.RECTIFYv1(outputmask(i))] = getUVfromXYZ(xyzGCP(i,1), xyzGCP(i,2), xyzGCP(i,3), icp, betaOUT);
+            [GPSpoints.Reprojectu1(outputmask(i)), GPSpoints.Reprojectv1(outputmask(i))] = getUVfromXYZ(xyzGCP(i,1), xyzGCP(i,2), xyzGCP(i,3), icp, betaOUT);
         end
+
+        % Print Beta parameters to add to the database
         fprintf("Beta parameters:\n");
         fprintf("%16.6f",betaOUT);
         fprintf("\n");

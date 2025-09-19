@@ -28,6 +28,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     app.Lefttabgroup.Layout.Column = 1;
     app.tab1 = uitab(app.Lefttabgroup,"Title","GoogleMap");
     app.tab2 = uitab(app.Lefttabgroup,"Title","Rectification");
+    app.tab3 = uitab(app.Lefttabgroup,"Title","Rectification Stats");
 
     % Create EarthViewAxes (left side for GPS map)
     app.EarthViewAxes = geoaxes(app.tab1);
@@ -39,6 +40,16 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     % Create RectificationAxes
     app.RectificationAxes=axes(app.tab2);
     title(app.RectificationAxes, 'Rectification Map');
+
+    % Create Rectification Stats Axes
+    app.RectStatsLayout = uigridlayout(app.tab3);
+    app.RectStatsLayout.RowHeight = {'1x', '1x'};
+    app.RectStatsLayout.ColumnWidth = {'1x', '1x'};
+
+    % Create UIAxes2 (right side for image display)
+    app.Histogramaxes = axes(app.RectStatsLayout);
+    app.Histogramaxes.Layout.Row = 1;
+    app.Histogramaxes.Layout.Column = 1;
     
 
     %% Variables
@@ -311,10 +322,12 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         updatePoints();
     end
 
-    function [Rectification] = CalcRectification(icp, betaOUT, xyzGCP, k, GPSpixel_dims)
+    function Rectification = CalcRectification(icp, betaOUT, xyzGCP, k, GPSpixel_dims)
         % k = Compression factor = 1, 2, 4, 8, 16, ... etc (for graphic performance reasons)
-        % GPSpixel_dims = [offsetx , offsety].  [2,1] is standard.  How many pixels will a GPS point highlight
-        outputmask=(GPSpoints.ImageU~=0);
+        % GPSpixel_dims = [offsetx , offsety].  [2,1] is the standard value
+        % How many pixels will a GPS point highlight on the rectification map
+        outputmask=find(GPSpoints.ImageU~=0);
+        
 
         Rectification=struct();
         Rectification.k=k;
@@ -328,39 +341,47 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         [Xa, Ya, Za] = getXYZfromUV(U, V, icp, betaOUT, Rectification.Zplane, '-z');
         
         % Compress the grid and image for better performance`
-        Xab=compressmatrix(Xa,k,k);
-        Yab=compressmatrix(Ya,k,k);
+        Rectification.Xab=compressmatrix(Xa,k,k);
+        Rectification.Yab=compressmatrix(Ya,k,k);
+        Rectification.Zab=compressmatrix(Za,k,k);
         
         % Create GPS overlay:
-        Rectification.GPSsurface=compressmatrix((Rectification.Zplane-1)*ones(icp.NV,icp.NU,1),k,k); % create a surface below
+        GPSsurface=compressmatrix((Rectification.Zplane-1)*ones(icp.NV,icp.NU,1),k,k); % create a surface below
+        indexX=[];
+        indexY=[];
+        
         for i=1:length(outputmask)
             if and(GPSpoints.ImageV(outputmask(i))~=0, GPSpoints.ImageU(outputmask(i))~=0)
-               
-                Rectification.GPSsurface(round(GPSpoints.ImageV(outputmask(i))/k)-GPSpixel_dims(2):round(GPSpoints.ImageV(outputmask(i))/k)+GPSpixel_dims(2),...
+                indexX(end+1,:)=round(GPSpoints.ImageV(outputmask(i))/k)-GPSpixel_dims(2):round(GPSpoints.ImageV(outputmask(i))/k)+GPSpixel_dims(2);
+                indexY(end+1,:)=round(GPSpoints.ImageU(outputmask(i))/k)-GPSpixel_dims(1):round(GPSpoints.ImageU(outputmask(i))/k)+GPSpixel_dims(1);
+
+                GPSsurface(round(GPSpoints.ImageV(outputmask(i))/k)-GPSpixel_dims(2):round(GPSpoints.ImageV(outputmask(i))/k)+GPSpixel_dims(2),...
                     round(GPSpoints.ImageU(outputmask(i))/k)-GPSpixel_dims(1):round(GPSpoints.ImageU(outputmask(i))/k)+GPSpixel_dims(1))=Rectification.Zplane; %Store a group of pixels instead just a single point
             end
         end
 
+        Rectification.GPSsurface=GPSsurface;
+
         % --- Calculate the error of the Projection vs the actual coordinates ---
         % Extract (X,Y) where surface overlay hits z=0
-        mask = (Rectification.GPSsurface == 0);   % logical mask
-        Xz = Xab(mask);
-        Yz = Yab(mask);
+        mask = (Rectification.GPSsurface == Rectification.Zplane);   % logical mask
+        Xz = Rectification.Xab(mask);
+        Yz = Rectification.Yab(mask);
         Zz = Rectification.GPSsurface(mask);      % should all be 0
         
         surfZeroPoints = [Xz(:), Yz(:), Zz(:)];   % Mx3 list of surface z=0 points
         
         % Your scatter3 points (already nx3, with z=0)
         scatterPoints = xyzGCP;
-        scatterPoints(:,3)=0; % don't calculate vertical distance
+        scatterPoints(:,3)=Rectification.Zplane; % don't calculate vertical distance
         
         % Calc distance
         D = pdist2(scatterPoints, surfZeroPoints);
         [Rectification.errors, ~] = min(D, [], 2);
     end
 
-    function DrawRectification()
-
+    function DrawRectification(ax,Rectification,xyzGCP); % create axes inside your figure)
+        cla(ax)
         % - - - Start plotting - - -
         % Get background img
         mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
@@ -368,27 +389,33 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         imgfile = imgfile(1);
         ocean = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
         ocean = double(rgb2gray(ocean));
+        oceanb=compressmatrix(ocean,Rectification.k,Rectification.k);
 
-        oceanb=compressmatrix(ocean,k,k);
+        % start the plot
 
-        f=figure(k);
-        ax = axes('Parent', f); % create axes inside your figure
+        orangecolor = repmat(reshape([247 193 84]/255,1,1,3), size(Rectification.Xab));
         hold(ax, 'on')
-        h1 = surf(ax,Xab,Yab,zeros(size(Xab)),'Cdata',repmat(oceanb,1,1,3)/255,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
+        app.rectsurface = surf(ax,Rectification.Xab,Rectification.Yab,Rectification.Zab,'Cdata',repmat(oceanb,1,1,3)/255,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
         
+        app.gpssurface = surf(ax,Rectification.Xab,Rectification.Yab,Rectification.GPSsurface,'Cdata',orangecolor,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
         
-        orangecolor = repmat(reshape([247 193 84]/255,1,1,3), size(Xab));
-        h2 = surf(ax,Xab,Yab,GPSoverlay_Z,'Cdata',orangecolor,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
-        shading(ax, 'flat');
-        
-        h3 = scatter3(xyzGCP(:,1),xyzGCP(:,2),zeros(1,size(xyzGCP,1)),36,"red");
-        shading(ax, 'flat');
+        app.gpspoints = scatter3(ax,xyzGCP(:,1),xyzGCP(:,2),Rectification.Zplane*ones(1,size(xyzGCP,1)),36,"red");
 
+        shading(ax, 'flat');
         set(ax,'DataAspectRatio', [1 1 1]);
-        ylabel('Alongshore (m)')
-        xlabel('Cross-shore (m)')
+        ylabel(ax,'Alongshore (m)')
+        xlabel(ax,'Cross-shore (m)')
 
-        function M_small = compressmatrix(M, krow, kcol)
+        % - - - Plot error bars - - - 
+        histogram(app.Histogramaxes,Rectification.errors,ceil(max(Rectification.errors)));
+        xlabel(app.Histogramaxes,'Error distance');
+        ylabel(app.Histogramaxes,'Count');
+        title(app.Histogramaxes,'Histogram of GCP distance pixel projection distance');
+
+        updateFullFrame()
+    end
+
+    function M_small = compressmatrix(M, krow, kcol)
             % Collapse a matrix where values repeat in blocks of krow × kcol
             
             % Get original size
@@ -408,7 +435,6 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         
             % Take the first element of each block (all values in block are equal)
             M_small = squeeze(M(1,:,1,:));
-        end
     end
 
     function redrawGCPS()
@@ -465,63 +491,9 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         fprintf("%16.6f",betaOUT);
         fprintf("\n");
 
-        % Print the rectification!
-        k = 4;  % scale factor: MUST BE EVENLY DIVISABLE BY icp.Nu and icp.NV (1, 2, 4, 8)
-
-        Uvals = repelem(0:k:(k*(icp.NU/k - 1)), k);   % U axis with repeats
-        Vvals = repelem(0:k:(k*(icp.NV/k - 1)), k);   % V axis with repeats
-        [U, V] = meshgrid(Uvals, Vvals);
+        Rectification = CalcRectification(icp, betaOUT, xyzGCP, 1, [2,1]);
         
-        [Xa, Ya, ~] = getXYZfromUV(U, V, icp, betaOUT, 0, '-z');    %find FRF X, Y coordinates
-        
-        function M_small = compressmatrix(M, krow, kcol)
-            % Collapse a matrix where values repeat in blocks of krow × kcol
-            % Example: krow=2, kcol=2 for your case
-            
-            % Get original size
-            [nr, nc] = size(M);
-            
-            % Trim to multiples of block size
-            nr_trim = floor(nr/krow)*krow;
-            nc_trim = floor(nc/kcol)*kcol;
-            M = M(1:nr_trim, 1:nc_trim);
-        
-            % New collapsed size
-            nr_new = nr_trim / krow;
-            nc_new = nc_trim / kcol;
-        
-            % Reshape into 4D: (krow, nr_new, kcol, nc_new)
-            M = reshape(M, krow, nr_new, kcol, nc_new);
-        
-            % Take the first element of each block (all values in block are equal)
-            M_small = squeeze(M(1,:,1,:));
-        end
-        
-        mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
-        imgfile = GPSpoints.FileIDX(mask);
-        imgfile = imgfile(1);
-
-        ocean = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
-        ocean = double(rgb2gray(ocean));
-        
-        % Compress the grid and image for better performance`
-        Xab=compressmatrix(Xa,k,k);
-        Yab=compressmatrix(Ya,k,k);
-        oceanb=compressmatrix(ocean,k,k);
-        
-        app.RectGraph=pcolor(app.RectificationAxes, Xab,Yab,oceanb);
-        hold on
-        set(app.RectGraph,'EdgeColor','none');
-        
-        colormap(app.RectificationAxes, gray);
-        ylim([-50 150])
-        xlim([-100 100])
-        ax = gca;
-        set(app.RectGraph,'DataAspectRatio', [1 1 1]);
-        ylabel('Alongshore (m)')
-        xlabel('Cross-shore (m)')
-
-        updateFullFrame()
+        DrawRectification(app.RectificationAxes,Rectification,xyzGCP);
     end
 
     function ImportCallback()

@@ -44,12 +44,24 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     % Create Rectification Stats Axes
     app.RectStatsLayout = uigridlayout(app.tab3);
     app.RectStatsLayout.RowHeight = {'1x', '1x'};
-    app.RectStatsLayout.ColumnWidth = {'1x', '1x'};
+    app.RectStatsLayout.ColumnWidth = {'2x', '1x'};
 
-    % Create UIAxes2 (right side for image display)
-    app.Histogramaxes = axes(app.RectStatsLayout);
-    app.Histogramaxes.Layout.Row = 1;
-    app.Histogramaxes.Layout.Column = 1;
+    % Create Rectification Histogram Axes
+    app.RectificationHistogramAxes = axes(app.RectStatsLayout);
+    app.RectificationHistogramAxes.Layout.Row = 1;
+    app.RectificationHistogramAxes.Layout.Column = 1;
+
+    % Create Error table
+    app.RectificationErrorTable = uitable(app.RectStatsLayout);
+    app.UITable.Layout.Row = 2;
+    app.UITable.Layout.Column = 2;
+    app.UITable.ColumnWidth={'1x','1x'};
+    app.UITable.ColumnEditable = [false, false];
+
+    % Create Error vs Distance Axes
+    app.RectificationDistanceError = axes(app.RectStatsLayout);
+    app.RectificationDistanceError.Layout.Row = 2;
+    app.RectificationDistanceError.Layout.Column = 1;
     
 
     %% Variables
@@ -352,8 +364,8 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         
         for i=1:length(outputmask)
             if and(GPSpoints.ImageV(outputmask(i))~=0, GPSpoints.ImageU(outputmask(i))~=0)
-                indexX(end+1,:)=round(GPSpoints.ImageV(outputmask(i))/k)-GPSpixel_dims(2):round(GPSpoints.ImageV(outputmask(i))/k)+GPSpixel_dims(2);
-                indexY(end+1,:)=round(GPSpoints.ImageU(outputmask(i))/k)-GPSpixel_dims(1):round(GPSpoints.ImageU(outputmask(i))/k)+GPSpixel_dims(1);
+                % indexX(end+1,:)=round(GPSpoints.ImageV(outputmask(i))/k)-GPSpixel_dims(2):round(GPSpoints.ImageV(outputmask(i))/k)+GPSpixel_dims(2);
+                % indexY(end+1,:)=round(GPSpoints.ImageU(outputmask(i))/k)-GPSpixel_dims(1):round(GPSpoints.ImageU(outputmask(i))/k)+GPSpixel_dims(1);
 
                 GPSsurface(round(GPSpoints.ImageV(outputmask(i))/k)-GPSpixel_dims(2):round(GPSpoints.ImageV(outputmask(i))/k)+GPSpixel_dims(2),...
                     round(GPSpoints.ImageU(outputmask(i))/k)-GPSpixel_dims(1):round(GPSpoints.ImageU(outputmask(i))/k)+GPSpixel_dims(1))=Rectification.Zplane; %Store a group of pixels instead just a single point
@@ -364,20 +376,27 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
 
         % --- Calculate the error of the Projection vs the actual coordinates ---
         % Extract (X,Y) where surface overlay hits z=0
-        mask = (Rectification.GPSsurface == Rectification.Zplane);   % logical mask
-        Xz = Rectification.Xab(mask);
-        Yz = Rectification.Yab(mask);
-        Zz = Rectification.GPSsurface(mask);      % should all be 0
+        % mask = (Rectification.GPSsurface == Rectification.Zplane);   % logical mask
+        % Xz = Rectification.Xab(mask);
+        % Yz = Rectification.Yab(mask);
+        % Zz = Rectification.GPSsurface(mask);      % should all be 0
+        % 
+        % surfZeroPoints = [Xz(:), Yz(:), Zz(:)];   % Mx3 list of surface z=0 points
+
+        [surfZeroPoints(:,1),surfZeroPoints(:,2),surfZeroPoints(:,3)] = getXYZfromUV(GPSpoints.ImageU(outputmask), GPSpoints.ImageV(outputmask), icp, betaOUT, xyzGCP(:,3), '-z');
         
-        surfZeroPoints = [Xz(:), Yz(:), Zz(:)];   % Mx3 list of surface z=0 points
         
         % Your scatter3 points (already nx3, with z=0)
         scatterPoints = xyzGCP;
-        scatterPoints(:,3)=Rectification.Zplane; % don't calculate vertical distance
+        % scatterPoints(:,3)=Rectification.Zplane; % don't calculate vertical distance
         
         % Calc distance
-        D = pdist2(scatterPoints, surfZeroPoints);
-        [Rectification.errors, ~] = min(D, [], 2);
+        Rectification.errors = zeros(size(surfZeroPoints,1),1);
+        for i=1:size(surfZeroPoints,1)
+            Rectification.errors(i)=norm(scatterPoints(i,:)- surfZeroPoints(i,:));
+        end
+        
+        % [Rectification.errors, ~] = min(D, [], 2);
     end
 
     function DrawRectification(ax,Rectification,xyzGCP); % create axes inside your figure)
@@ -393,13 +412,13 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
 
         % start the plot
 
-        orangecolor = repmat(reshape([247 193 84]/255,1,1,3), size(Rectification.Xab));
+        ImageUVcolor = repmat(reshape([66, 245, 99]/255,1,1,3), size(Rectification.Xab)); % Green color
         hold(ax, 'on')
         app.rectsurface = surf(ax,Rectification.Xab,Rectification.Yab,Rectification.Zab,'Cdata',repmat(oceanb,1,1,3)/255,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
         
-        app.gpssurface = surf(ax,Rectification.Xab,Rectification.Yab,Rectification.GPSsurface,'Cdata',orangecolor,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
+        app.gpssurface = surf(ax,Rectification.Xab,Rectification.Yab,Rectification.GPSsurface,'Cdata',ImageUVcolor,'FaceColor','texturemap','EdgeColor','none','CDataMapping','direct');
         
-        app.gpspoints = scatter3(ax,xyzGCP(:,1),xyzGCP(:,2),Rectification.Zplane*ones(1,size(xyzGCP,1)),36,"red");
+        app.gpspoints = scatter3(ax,xyzGCP(:,1),xyzGCP(:,2),Rectification.Zplane*ones(1,size(xyzGCP,1)),36,[252, 86, 3]/255); % Orange color
 
         shading(ax, 'flat');
         set(ax,'DataAspectRatio', [1 1 1]);
@@ -407,10 +426,10 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         xlabel(ax,'Cross-shore (m)')
 
         % - - - Plot error bars - - - 
-        histogram(app.Histogramaxes,Rectification.errors,ceil(max(Rectification.errors)));
-        xlabel(app.Histogramaxes,'Error distance');
-        ylabel(app.Histogramaxes,'Count');
-        title(app.Histogramaxes,'Histogram of GCP distance pixel projection distance');
+        histogram(app.RectificationHistogramAxes,Rectification.errors,ceil(max(Rectification.errors)));
+        xlabel(app.RectificationHistogramAxes,'Error distance');
+        ylabel(app.RectificationHistogramAxes,'Count');
+        title(app.RectificationHistogramAxes,'Histogram of GCP distance pixel projection distance');
 
         updateFullFrame()
     end
@@ -456,7 +475,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     end
 
     function saveCallback()
-        savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat("PrepControlPoint-",num2str(UserPrefs.SurveyDate),UserPrefs.CamFieldSite, UserPrefs.CamNickName, "_SN",num2str(UserPrefs.CamSN),".mat"));
+        savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat("GCR-",num2str(UserPrefs.SurveyDate),UserPrefs.CamFieldSite, UserPrefs.CamNickName, "_SN",num2str(UserPrefs.CamSN),".mat"));
         temp=savefilename;
         [savefilename,savelocation]=uiputfile('*.mat', 'Save As',savefilename); % pull up SaveAs dialog (write new name if user wants to change it)
         if savefilename == 0 % handle user cancel input
@@ -491,9 +510,30 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         fprintf("%16.6f",betaOUT);
         fprintf("\n");
 
-        Rectification = CalcRectification(icp, betaOUT, xyzGCP, 1, [2,1]);
+        Rectification_compressed = CalcRectification(icp, betaOUT, xyzGCP, 2, [2,1]);
+        Rectification = CalcRectification(icp, betaOUT, xyzGCP, 1, [1,1]);
         
-        DrawRectification(app.RectificationAxes,Rectification,xyzGCP);
+        DrawRectification(app.RectificationAxes,Rectification_compressed,xyzGCP);
+
+        %--- Histogram of errors ---
+        histogram(app.RectificationHistogramAxes, Rectification.errors,30);
+        xlabel(app.RectificationHistogramAxes,'Error distance (m)');
+        ylabel(app.RectificationHistogramAxes,'Count');
+        title(app.RectificationHistogramAxes,'Raw Projection error vs Survey point (m)');
+
+        app.RectificationErrorTable.Data= table(num2cell(GPSpoints.Name(outputmask,:)),num2cell(Rectification.errors) ,'VariableNames',{'PointNum', 'Error Distance (m)'});
+
+        %--- Error based on distance to cam ---
+        % Calc distance
+        GCPdistancetoCamera = pdist2(xyzGCP, repmat([0,0,0],size(xyzGCP,1),1));
+
+
+        cla(app.RectificationDistanceError)
+        scatter(app.RectificationDistanceError, GCPdistancetoCamera,Rectification.errors)
+        hold(app.RectificationDistanceError, 'on')
+        title(app.RectificationDistanceError, 'GCP XY Errors vs projection distance');
+        xlabel(app.RectificationDistanceError, 'Distance to camera (m)');
+        ylabel(app.RectificationDistanceError, 'XY Error (m)');
     end
 
     function ImportCallback()

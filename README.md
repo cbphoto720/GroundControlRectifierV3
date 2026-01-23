@@ -11,3 +11,12 @@ This software was written to streamline the addition of new camera systems to th
 # Outputs
 - Camera Beta parameters that can be used to rectify any subsequent images!  (add these to the database)
 - GCPs with ImageU and ImageV coordinates (add these to the database)
+
+
+# Improvements
+- Issue a warning that the camera needs to be added to the database before continuing (add it now ... cancel ... continue)
+- Survey input GUI needs rework. <br>
+&emsp;-> Output folder only (no output folder path)
+- Camera DB needs a fcn to add a brand new camera and survey based on the Survey input GUI
+- Usable IMGs needs to check all subfolders and needs to ensure the CamSN is in the filename
+- addnewCamera_CPG_CamDatabase needs to be updated

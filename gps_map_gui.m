@@ -263,9 +263,10 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
             hImg = imshow(app.img, 'Parent', app.IMGaxes);
             set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
         else
-            if exist(fullfile(UserPrefs.UsableIMGsFolder,imgfile))
+            checkFile = dir(fullfile(UserPrefs.UsableIMGsFolder, '**', imgfile));
+            if ~isempty(checkFile)
             % Load and show actual image
-                app.img = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
+                app.img = imread(fullfile(checkFile.folder,imgfile));
                 hImg = imshow(app.img, 'Parent', app.IMGaxes);
                 set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
             else

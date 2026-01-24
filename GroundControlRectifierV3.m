@@ -121,24 +121,27 @@ addpath(genpath(path_to_CPG_CamDatabase_folder));
 FullCamDB=readCPG_CamDatabase("CamSN",UserPrefs.CamSN);
 
 % Find files in usable img folder 
-files_tif  = dir(fullfile(UserPrefs.UsableIMGsFolder, '*.tif'));
-files_TIF  = dir(fullfile(UserPrefs.UsableIMGsFolder, '*.TIF'));
-files_jpg  = dir(fullfile(UserPrefs.UsableIMGsFolder, '*.jpg'));
-files_JPG  = dir(fullfile(UserPrefs.UsableIMGsFolder, '*.JPG'));
-files = [files_tif; files_TIF; files_jpg; files_JPG];
-clear files_tif files_TIF files_jpg files_JPG
-files=struct2table(files);
-files.datetime=datetime(files.datenum,'ConvertFrom','datenum'); % Create datetime column
-
-%
-CameraDBentry=readCPG_CamDatabase(format="searchtable", CamSN=UserPrefs.CamSN);
-if contains(CameraDBentry.Fieldsite, "Seacliff")
-    filemask=contains(files.name, strcat("Seacliff_",string(CameraDBentry.CamSN)));
-elseif contains(CameraDBentry.Fieldsite, "Ponto")
-    filemask=contains(files.name, CameraDBentry.CamID);
+extensions = {'*.tif', '*.TIF', '*.jpg', '*.JPG'};
+files = [];
+for ext = extensions
+    % The '**' tells MATLAB to look in all subfolders
+    current_files = dir(fullfile(UserPrefs.UsableIMGsFolder, '**', ext{1}));
+    files = [files; current_files];
+end
+% Convert to table and handle dates
+if ~isempty(files)
+    files = struct2table(files);
+    files.datetime = datetime(files.datenum, 'ConvertFrom', 'datenum');
 else
+    warning('No images found in the specified directory or subdirectories.');
+end
+
+% Mask files that were taken with other cameras
+CameraDBentry=readCPG_CamDatabase(format="searchtable", CamSN=UserPrefs.CamSN);
+filemask=contains(files.name, CameraDBentry.Filename);
+if all(filemask==0)
     error(['Could not find any files in usable-imgs folder matching your selected camera SN.\n' ...
-        'Filename: %s'],'') %WIP improve this error message to list filename once data is available in CPG_CamDatabase
+        'Filename from CPG_CamDatabase: %s'],CameraDBentry.Filename)
 end
 files=files(filemask,:); % Remove files that are captured from different cameras
 
@@ -220,6 +223,7 @@ uiwait(hFig);  % Wait until the GUI resumes or is closedy
 function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase()
     CameraOptionsTable=readCPG_CamDatabase(format="searchtable");
     CameraOptionsTable.Date=[]; % remove date for display purposes
+    CameraOptionsTable.Filename=[]; % remove date for display purposes
     CameraOptionsTable.Fieldsite=char(CameraOptionsTable.Fieldsite); % convert to char
     CameraOptionsTable.CamID=char(CameraOptionsTable.CamID); % convert to char
     CameraOptionsTable.Checkbox=false(height(CameraOptionsTable),1); % add checkbox for user selection

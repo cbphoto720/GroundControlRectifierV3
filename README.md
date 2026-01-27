@@ -22,9 +22,9 @@ This software was written to streamline the addition of new camera systems to th
 
 ### Generate the Rectification Parameters
 1. Pull any CPG_CamDatabase changes from main and then please make a new branch and name it your SiteID.
-2. Create a blank entry in the Camera Database.  Copy the "SiteID: Test" entry with at least one of the survey dates D20250101T000000Z all the way down to CamPose.  From there, modify the SiteID, CamID, CamSN, Filename with any information you already have.  Intrinsics and CamPose will be filled automatically by the program later. <br>
+2. Create a blank entry in the Camera Database.  Copy the "SiteID: Test" entry with at least one of the survey dates D20250101T000000Z all the way down to CamPose.  From there, modify the SiteID, CamID, CamSN, Filename with any information you already have.  Intrinsics also need to be added.  You can use appendSIO_CamDatabase.m to structure the instrinsics for now, then just copy the Intrinsics part of the text output.  But currently the YAML must be manually edited.<br>
 &emsp; -> Potential Variables: SiteID, CamID, CamSN, IMG-Filename,<br>&emsp;&emsp;&nbsp; Northings, Eastings, UTM zone, ImageSize_U, ImageSize_V <br>
-&emsp; **%WIP write a function to add a blank camera entry**
+&emsp; **%WIP write a function to add a blank camera entry with CameraParams intrinsics already included**
 3. Locate your GPS survey files for GCPs and camera position.  Fix any errors in the GCP description (add descriptions if blank, fix mislabeled sets).  Denote that you have fixed any issues by adding -SETCORRECTED to the filename.  (example: *20260114_DohenyGCP-SETCORRECTED.txt*)
 4. Assemble all potential calibration images into 1 folder (subfolders are fine).  The code compares the GPS capture time to the image capture time to sync the sets.
 5. Run GCRV3.

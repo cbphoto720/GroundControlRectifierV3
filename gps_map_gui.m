@@ -250,13 +250,13 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
 
     % Function to update the image display
     function updateImage()
-        %update title in the top corner:
-        app.IMG_desc_label.Text=sprintf("%s, %s, SN %d", UserPrefs.CamFieldSite, UserPrefs.CamNickName, UserPrefs.CamSN);
-
         % Get the image filename from FileIDX based on setIDX
         mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
         imgfile = GPSpoints.FileIDX(mask);
-        imgfile = imgfile(1);
+        imgfile = imgfile(1); %DEBUG remove ; to get the filename in the command window
+
+        %update title in the top corner:
+        app.IMG_desc_label.Text=sprintf("%s, %s, SN %d, \n IMG: %s", UserPrefs.CamFieldSite, UserPrefs.CamNickName, UserPrefs.CamSN, imgfile);
         
         if strcmp(imgfile, "")
             app.img = uint8(255 * ones(100,100,3)); % white 100x100 placeholder
@@ -351,7 +351,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         
         Rectification.Zplane=mean(xyzGCP(:,3));
 
-        [Xa, Ya, Za] = getXYZfromUV(U, V, icp, betaOUT, Rectification.Zplane, '-z');
+        [Xa, Ya, Za] = getXYZfromUV(U, V, icp, betaOUT, Rectification.Zplane, '-z',2.5);
         
         % Compress the grid and image for better performance`
         Rectification.Xab=compressmatrix(Xa,k,k);
@@ -384,7 +384,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         % 
         % surfZeroPoints = [Xz(:), Yz(:), Zz(:)];   % Mx3 list of surface z=0 points
 
-        [surfZeroPoints(:,1),surfZeroPoints(:,2),surfZeroPoints(:,3)] = getXYZfromUV(GPSpoints.ImageU(outputmask), GPSpoints.ImageV(outputmask), icp, betaOUT, xyzGCP(:,3), '-z');
+        [surfZeroPoints(:,1),surfZeroPoints(:,2),surfZeroPoints(:,3)] = getXYZfromUV(GPSpoints.ImageU(outputmask), GPSpoints.ImageV(outputmask), icp, betaOUT, xyzGCP(:,3), '-z',2.5);
         
         
         % Your scatter3 points (already nx3, with z=0)
@@ -407,7 +407,8 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
         imgfile = GPSpoints.FileIDX(mask);
         imgfile = imgfile(1);
-        ocean = imread(fullfile(UserPrefs.UsableIMGsFolder,imgfile));
+        checkFile = dir(fullfile(UserPrefs.UsableIMGsFolder, '**', imgfile));
+        ocean = imread(fullfile(checkFile.folder,imgfile));
         ocean = double(rgb2gray(ocean));
         oceanb=compressmatrix(ocean,Rectification.k,Rectification.k);
 

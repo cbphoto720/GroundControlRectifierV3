@@ -29,8 +29,24 @@ This software was written to streamline the addition of new camera systems to th
 4. Assemble all potential calibration images into 1 folder (subfolders are fine).  The code compares the GPS capture time to the image capture time to sync the sets.
 5. Run GCRV3.
 
+### GCRV3
+- Pick points with pink pointers!  I tried to keep the theme for clarity
+1. Matlab: Run GroundControlRectifierV3.m
+2. "ready to start" **(WARNING: This will clear all workspace variables)**
+3. Fill out the folder paths, survey date, etc.  (use checkmark to save your settings as default for next time.  filename PCP_DefaultOptions.mat)
+4. Your blank camera entry in the database should show up!  Select 1 camera at a time
+5. Select survey date.
+6. in the command window, check the difference between last GPS time and image capture time.  Make sure this is reasonable for your survey.
+7. Ground control picker app should open
+8. use Prev set & Next set to navigate through imgs/GPS points
+9. use built in matlab zoom to cozy up to the ground control targets.  Disable all built-in tools and ensure "Pick GCP" is active to click on screen where the center of the target is.  **Make sure to select the target to the corresponding GPS point**
+10. Save you progress!  Filename is automatically generated but can be whatever you want.
+11. When all points have been selected, click Calculate!  Then check out the sample rectification 
 
 # Improvements
+### Bugs
+- importing new camera should clear calibrations!
+
 ### WIP
 - fix PickCamFromDatabase to either delete Filename or display a new column for Filename
 - this is to make it easier for img search to work through subfolders

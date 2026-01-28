@@ -308,7 +308,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         if app.DisplayProjection
             PROJECTIONpoints_GCPplot=GPSpoints(GPSpoints.Reprojectu1~=0,:);
             for i=1:height(PROJECTIONpoints_GCPplot)
-                scatter(app.IMGaxes, GPSpoints.Reprojectu1(i), GPSpoints.Reprojectv1(i), ...
+                scatter(app.IMGaxes, PROJECTIONpoints_GCPplot.Reprojectu1(i), PROJECTIONpoints_GCPplot.Reprojectv1(i), ...
                         20, [252, 86, 3]/255, 'o', 'Tag', 'GCPscatter'); % Orange color
             end
         end

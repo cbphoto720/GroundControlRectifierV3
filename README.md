@@ -46,6 +46,7 @@ This software was written to streamline the addition of new camera systems to th
 # Improvements
 ### Bugs
 - importing new camera should clear calibrations!
+- opening a save state mat file in the workspace should also import the points into the GUI.  Currently, import must be selected from within the app
 
 ### WIP
 - fix PickCamFromDatabase to either delete Filename or display a new column for Filename

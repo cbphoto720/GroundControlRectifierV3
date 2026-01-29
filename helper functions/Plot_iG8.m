@@ -6,7 +6,7 @@
 %% Options
 load("hawaiiS.txt"); % Load color map
 
-filename="\\reefbreak.ucsd.edu\camera\Doheny-Camera\Calibration\20260114_GCPS\20251210_Doheny-CameraInstall.txt";
+filename="C:\Users\Carson\Downloads\20251118_SeacliffGCP (1).txt";
 
 Addlabels=true; % (boolean) Add labels to each point based on Code description
 drawcircles=0; % (m) Draw circles around each point set to "0" meters to turn off

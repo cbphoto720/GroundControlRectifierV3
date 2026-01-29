@@ -1,4 +1,4 @@
-function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
+function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
     % Load Colormap
     load("hawaiiS.txt"); % Load color map
 
@@ -492,7 +492,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
     function CalculateCallback()
         app.DisplayProjection = true;
         outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
-        [pose, xyzGCP] = EstimateCameraPose(FullCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:));
+        [pose, xyzGCP] = EstimateCameraPose(IndividualCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:));
 
         % Generate ICP (Internal Camera Parameters [Intrinsics])
         readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=string(UserPrefs.DateofICP(2:end)),format="compact");
@@ -521,6 +521,8 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         histogram(app.RectificationHistogramAxes, Rectification.errors,30);
         xlabel(app.RectificationHistogramAxes,'Error distance (m)');
         ylabel(app.RectificationHistogramAxes,'Count');
+        % xlim(app.RectificationHistogramAxes, [0 1.6]); %TEMP
+        % ylim(app.RectificationHistogramAxes, [0 8]); %TEMP
         title(app.RectificationHistogramAxes,'Raw Projection error vs Survey point (m)');
 
         app.RectificationErrorTable.Data= table(num2cell(GPSpoints.Name(outputmask,:)),num2cell(Rectification.errors) ,'VariableNames',{'PointNum', 'Error Distance (m)'});
@@ -534,6 +536,8 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, FullCamDB)
         scatter(app.RectificationDistanceError, GCPdistancetoCamera,Rectification.errors)
         hold(app.RectificationDistanceError, 'on')
         title(app.RectificationDistanceError, 'GCP XY Errors vs projection distance');
+        % xlim(app.RectificationDistanceError, [0 400]); %TEMP
+        % ylim(app.RectificationDistanceError, [0 1.4]); %TEMP
         xlabel(app.RectificationDistanceError, 'Distance to camera (m)');
         ylabel(app.RectificationDistanceError, 'XY Error (m)');
     end

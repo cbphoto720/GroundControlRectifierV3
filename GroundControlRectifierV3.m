@@ -118,7 +118,7 @@ addpath(genpath(path_to_CPG_CamDatabase_folder));
 [UserPrefs.CamFieldSite,UserPrefs.CamSN,UserPrefs.CamNickName]=PickCamFromDatabase();
 [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CamSN);
 
-FullCamDB=readCPG_CamDatabase("CamSN",UserPrefs.CamSN);
+IndividualCamDB=readCPG_CamDatabase("CamSN",UserPrefs.CamSN);
 
 % Find files in usable img folder 
 extensions = {'*.tif', '*.TIF', '*.jpg', '*.JPG'};
@@ -187,7 +187,7 @@ disp(DifTimes);
 clear i dif INDvalues filemask linkedIDX localIDX mask maskedIndicies minIND numpoints SetMask timediff maskedIndices
 %% Get UV coordinates from relevant GPS data
 
-hFig = gps_map_gui(UserPrefs, GPSpoints, FullCamDB);  % Get figure handle
+hFig = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB);  % Get figure handle
 % uiwait(hFig);  % Wait until the GUI resumes or is closedy
 
 %% Generate Cam pose based on the GPS points

@@ -187,7 +187,7 @@ disp(DifTimes);
 clear i dif INDvalues filemask linkedIDX localIDX mask maskedIndicies minIND numpoints SetMask timediff maskedIndices
 %% Get UV coordinates from relevant GPS data
 
-hFig = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB);  % Get figure handle
+hFig = gps_map_gui(UserPrefs, GPSpoints, readCPG_CamDatabase("CamSN",UserPrefs.CamSN));  % Get figure handle
 % uiwait(hFig);  % Wait until the GUI resumes or is closedy
 
 %% Generate Cam pose based on the GPS points

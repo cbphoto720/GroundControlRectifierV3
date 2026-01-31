@@ -62,6 +62,7 @@ This software was written to streamline the addition of new camera systems to th
 - Camera DB needs a fcn to add a brand new camera and survey based on the Survey input GUI
 - Usable IMGs needs to check all subfolders and needs to ensure the CamSN is in the filename
 - addnewCamera_CPG_CamDatabase needs to be updated for new yaml format
+<br>&emsp; -> this fcn should import the entire YAML then re-write using code
 - adding a new feature search to the Cam database is extremely annoying
 <br>&emsp; -> Needed to add Var name and expected type to searchtable (ok)
 <br>&emsp; -> Had to aded yamlData{i}.Cameras{j}.Filename to final searchtable output

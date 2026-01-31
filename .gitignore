@@ -1,7 +1,10 @@
-
 LeviGCPsoftwareNotes.txt
 PickControlPointsV5.m
 data/20241023/CamB/test1/PCP_version3_rectify.mat
-__pycache__/convert_tab_to_yaml.cpython-312.pyc
+__pycache__/
 .venv/
 *.asv
+ignore/
+SCRATCHPAPER.m
+PCP_DefaultOptions.mat
+PCP_DefaultOptions.mat

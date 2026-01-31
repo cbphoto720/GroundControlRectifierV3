@@ -6,12 +6,12 @@
 %% Options
 load("hawaiiS.txt"); % Load color map
 
-filename="20250508_Seacliff_TargetGCPs.txt";
+filename="C:\Users\Carson\Downloads\20251118_SeacliffGCP (1).txt";
 
 Addlabels=true; % (boolean) Add labels to each point based on Code description
 drawcircles=0; % (m) Draw circles around each point set to "0" meters to turn off
 
-GPSpoints=importGPSpoints(filename);
+GPSpoints=importiG8points(filename);
 %% Generate Map
 
 % Create main UI figure
@@ -42,6 +42,8 @@ for i = 1:NUM_IMGsets
     mask = strcmp(GPSpoints{:,2}, setnames{i});
     geoscatter(geoax, GPSpoints.Latitude(mask), GPSpoints.Longitude(mask), ...
                36, hawaiiS(mod(i-1, 100) + 1, :), "filled"); % Wrap colors properly
+    % geoscatter(geoax, GPSpoints.Latitude(mask), GPSpoints.Longitude(mask), ...
+               % 36, [1 0 0], "filled"); % Wrap colors properly
 end
 
 % Add labels
@@ -52,10 +54,11 @@ if Addlabels
     % Randomize the label direction by creating a unit vector.
     vec=-1+(1+1)*rand(length(a),2);
     dir=vec./(((vec(:,1).^2)+(vec(:,2).^2)).^(1/2));
-    scale=0.000002; % offset text from point
+    scale=0.0000000006; % offset text from point
     % dir(:)=0; % turn ON randomization by commenting out this line
-    offsetx=-0.0000004+dir(:,1)*scale; % offset text on the point
+    offsetx=-0.000002+dir(:,1)*scale; % offset text on the point
     offsety=-0.00000008+dir(:,2)*scale; % offset text on the point
+    % text(geoax,GPSpoints.Latitude+offsety,GPSpoints.Longitude+offsetx,c,'Color','red','FontSize',14)
     text(geoax,GPSpoints.Latitude+offsety,GPSpoints.Longitude+offsetx,c)
 end
 

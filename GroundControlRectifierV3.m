@@ -224,7 +224,7 @@ function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase()
     CameraOptionsTable=readCPG_CamDatabase(format="searchtable");
     CameraOptionsTable.Date=[]; % remove date for display purposes
     CameraOptionsTable.Filename=[]; % remove date for display purposes
-    CameraOptionsTable.Fieldsite=char(CameraOptionsTable.Fieldsite); % convert to char
+    CameraOptionsTable.SiteID=char(CameraOptionsTable.SiteID); % convert to char
     CameraOptionsTable.CamID=char(CameraOptionsTable.CamID); % convert to char
     CameraOptionsTable.Checkbox=false(height(CameraOptionsTable),1); % add checkbox for user selection
 
@@ -244,7 +244,7 @@ function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase()
 
     Prompt(end+1,:) = {'Item Table','Table',[]};
     Formats(2,1).type = 'table';
-    Formats(2,1).items = {'Fieldsite', 'CamSN', 'CamID', 'Checkbox'};
+    Formats(2,1).items = {'SiteID', 'CamSN', 'CamID', 'Checkbox'};
     Formats(2,1).format = {'char', 'char', 'char', 'logical'};
     Formats(2,1).size = [-1 -1];
     DefAns.Table = table2cell(CameraOptionsTable);

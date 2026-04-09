@@ -3,6 +3,9 @@ function GPSpoints = importiG8points(filename,options)
 % or the LandStar app on android (google drive)
     % use Format="Long" to import more variables from the gDrive
     % (default is Format="Short")
+% Elevation is NAVD88 reference based on the RTK broadcasting station you
+% are connected to!  CPG uses the 2010 datum.
+% H is the ellipsoid height.  CPG export format from phones uses Geoid 12b
     arguments
         filename (1,1) string {mustBeText}
         options.Format (1,1) string {mustBeText} = getDefaultOptions().Format

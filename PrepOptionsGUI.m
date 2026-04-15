@@ -190,8 +190,9 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
         
         cancelled = false;
         if cbDefOps.Value
+            savepath = fullfile(fileparts(mfilename('fullpath')),"PrepOptionsGUI_Defaults.mat");
             DefAns = answers;
-            save(DefaultOptions, 'DefAns');
+            save(savepath, 'DefAns');
         end
         delete(fig);
     end

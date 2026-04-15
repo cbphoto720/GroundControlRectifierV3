@@ -74,7 +74,7 @@ switch selection
 end
 
 %% Options
-DefaultOpsFile="PCP_DefaultOptions.mat"; % Rename this file for multiple defaults!
+DefaultOpsFile="PrepOptionsGUI_Defaults.mat"; % Rename this file for multiple defaults!
 
 if ~exist(DefaultOpsFile,'file')
     [UserPrefs,cancelled]=PrepOptionsGUI();
@@ -89,7 +89,7 @@ elseif(UserPrefs.SetOptAsDefault) %handle storing new defaults file
     DefAns=UserPrefs;
     save(savepath,"DefAns","-mat");
     clear DefAns savepath
-elseif(exist(fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName),'file')==7) %check if output folder exists
+elseif(exist(UserPrefs.OutputPath,'file')==7) %check if output folder exists
     fig = uifigure;
     selection = uiconfirm(fig,'Warning! Output folder already exists! Ok to over-write?','Output Warning',"Icon","warning");
     switch selection
@@ -125,7 +125,7 @@ extensions = {'*.tif', '*.TIF', '*.jpg', '*.JPG'};
 files = [];
 for ext = extensions
     % The '**' tells MATLAB to look in all subfolders
-    current_files = dir(fullfile(UserPrefs.UsableIMGsFolder, '**', ext{1}));
+    current_files = dir(fullfile(UserPrefs.GCPimgPath, '**', ext{1}));
     files = [files; current_files];
 end
 % Convert to table and handle dates

@@ -72,6 +72,12 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
     GPSpoints.Reprojectv1=GPSpoints.ImageU;
     % GPSpoints.scatterHandle=gobjects(height(GPSpoints), 1);
 
+    % Create new CamDB
+    [path_to_CPG_CamDatabase_folder, ~, ~] = fileparts(UserPrefs.CameraDB);
+    addpath(genpath(path_to_CPG_CamDatabase_folder));
+
+    FullDB=readCPG_CamDatabase();
+
     % Get unique descriptions (setnames)
     setnames = getSetNames(GPSpoints);
     NUM_IMGsets = numel(setnames); % Get number of unique sets
@@ -263,20 +269,20 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
             hImg = imshow(app.img, 'Parent', app.IMGaxes);
             set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
         else
-            checkFile = dir(fullfile(UserPrefs.UsableIMGsFolder, '**', imgfile));
+            checkFile = dir(fullfile(UserPrefs.GCPimgPath, '**', imgfile));
             if ~isempty(checkFile)
             % Load and show actual image
                 app.img = imread(fullfile(checkFile.folder,imgfile));
                 hImg = imshow(app.img, 'Parent', app.IMGaxes);
                 set(hImg, 'ButtonDownFcn', @(src, event) IMGclickCallback(src, event));
             else
-                title = "UsableIMGsFolder";
-                quest = [sprintf("Unable to find img: %s",imgfile), "Would you like to re-select the Usable-imgs folder?"];
+                title = "GCPimgPath";
+                quest = [sprintf("Unable to find img: %s",imgfile), "Would you like to re-select the GCPimgPath folder?"];
                 pbtns = ["Yes","No"];
                 
                 Switchfolder = questdlg(quest,title, pbtns);
                 if strcmp(Switchfolder,"Yes")
-                    UserPrefs.UsableIMGsFolder=uigetdir(UserPrefs.UsableIMGsFolder);
+                    UserPrefs.GCPimgPath=uigetdir(UserPrefs.GCPimgPath);
                     updateImage();
                 end
             end
@@ -407,7 +413,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
         mask = strcmp(GPSpoints{:,2}, setnames{setIDX});
         imgfile = GPSpoints.FileIDX(mask);
         imgfile = imgfile(1);
-        checkFile = dir(fullfile(UserPrefs.UsableIMGsFolder, '**', imgfile));
+        checkFile = dir(fullfile(UserPrefs.GCPimgPath, '**', imgfile));
         ocean = imread(fullfile(checkFile.folder,imgfile));
         ocean = double(rgb2gray(ocean));
         oceanb=compressmatrix(ocean,Rectification.k,Rectification.k);
@@ -477,7 +483,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
     end
 
     function saveCallback()
-        savefilename=fullfile(UserPrefs.OutputFolder,UserPrefs.OutputFolderName,strcat("GCR-",num2str(UserPrefs.SurveyDate),UserPrefs.CamFieldSite, UserPrefs.CamNickName, "_SN",num2str(UserPrefs.CamSN),".mat"));
+        savefilename=fullfile(UserPrefs.OutputPath,strcat("GCR-",num2str(UserPrefs.SurveyDate),UserPrefs.CamFieldSite, UserPrefs.CamNickName, "_SN",num2str(UserPrefs.CamSN),".mat"));
         temp=savefilename;
         [savefilename,savelocation]=uiputfile('*.mat', 'Save As',savefilename); % pull up SaveAs dialog (write new name if user wants to change it)
         if savefilename == 0 % handle user cancel input
@@ -530,7 +536,12 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
             betaOUT(4), betaOUT(5), betaOUT(6)...
             );
 
+        % Create new CamDB
+        
 
+        FullDB=readCPG_CamDatabase();
+
+        % Compress the display Rectification
         Rectification_compressed = CalcRectification(icp, betaOUT, xyzGCP, 2, [2,1]);
         Rectification = CalcRectification(icp, betaOUT, xyzGCP, 1, [1,1]);
         

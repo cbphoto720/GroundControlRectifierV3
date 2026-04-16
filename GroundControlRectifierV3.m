@@ -84,26 +84,10 @@ end
 
 if(cancelled==1)
     error('User selected cancel.')
-elseif(UserPrefs.SetOptAsDefault) %handle storing new defaults file
-    savepath = fullfile(fileparts(mfilename('fullpath')),DefaultOpsFile);
-    DefAns=UserPrefs;
-    save(savepath,"DefAns","-mat");
-    clear DefAns savepath
-elseif(exist(UserPrefs.OutputPath,'file')==7) %check if output folder exists
-    fig = uifigure;
-    selection = uiconfirm(fig,'Warning! Output folder already exists! Ok to over-write?','Output Warning',"Icon","warning");
-    switch selection
-        case 'OK'
-            close(fig);
-        case 'Cancel'
-            close(fig);
-            error('User selected cancel.')
-    end
-    clear selection fig
 end
 clear cancelled DefaultOpsFile
 
-%% Pick Camera from database
+%% Fix UserPrefs file & import GPS
 GPSpoints = importiG8points(UserPrefs.GPSSurveyFile);
 GPSshape=size(GPSpoints);
 if GPSshape(2)==23 % Check GPS format
@@ -111,16 +95,66 @@ if GPSshape(2)==23 % Check GPS format
 end
 clear GPSshape
 
+% Automatically select survey date from GPS file
+if UserPrefs.PullDateFromGPS
+    alldays = dateshift(GPSpoints.Time, 'start', 'day');
+    unique_days = unique(alldays);
+    if isscalar(unique_days)
+       UserPrefs.SurveyDate=string(unique_days, 'yyyyMMdd'); 
+    else
+        error('GPS file contains points from multiple days!  Please manually choose a survey date')
+    end
+end
+
+% Convert string input to double
+UserPrefs.CamSN=str2double(UserPrefs.CamSN);
+
 [path_to_CPG_CamDatabase_folder, ~, ~] = fileparts(UserPrefs.CameraDB);
 addpath(genpath(path_to_CPG_CamDatabase_folder));
+IndividualCamDB=readCPG_CamDatabase("SiteId", UserPrefs.SiteID, "CamSN",UserPrefs.CamSN);
+
+% Choose which intrinsics to use
+if UserPrefs.UsePrevCalib
+    % Use the database to grab the previous Camera Calibration
+    IndividualCamDB_ST=readCPG_CamDatabase("CamSN",UserPrefs.CamSN,Format="SearchTable");
+    validDateIDX = find(IndividualCamDB_ST.Date{1} <= datetime(UserPrefs.SurveyDate,"InputFormat",'yyyyMMdd','TimeZone','UTC'),1,'last'); % Choose closest date without going over
+
+    UserPrefs.DateofICP=string(datetime(IndividualCamDB_ST.Date{1}(validDateIDX)),'yyyyMMdd'); %Temporarily set as Date yyyyMMdd
+
+    pattern = strcat('D', UserPrefs.DateofICP, 'T');
+    list=fieldnames(IndividualCamDB);
+    matchIdx = contains(list, pattern);
+    if any(matchIdx)
+        % Extract the full string (e.g., 'D20250122T220000Z')
+        UserPrefs.DateofICP = list{matchIdx}; % change to ISO 8601 naming
+    else
+        error('No matching date found in the database list.');
+    end
+    clear pattern list matchIdx\
+else
+    % Upload a file to include the camera GCPs
+    %UserPrefs.Calib= PATH TO .mat file
+    % Use struct2cell to peel the name away immediately
+    data = struct2cell(load(UserPrefs.CalibFile));
+    cameracalib = data{1};
+    clear data
+
+    UserPrefs.DateofICP=strcat('D',UserPrefs.SurveyDate,'T070000Z');
+end
+
+NewCamEntry=generate_CameraDBstruct(...
+    SiteID=UserPrefs.SiteID,...
+    CamID=UserPrefs.CamID,...
+    CamSN=UserPrefs.CamSN,...
+    Filename=UserPrefs.CameraFilename, ...
+    Date=UserPrefs.SurveyDate,...
+    CameraParams=cameracalib); % Create a workspace var based on User inputs
 
 % Have user select Camera and Intrinsics they want to use for this rectification
-[UserPrefs.CamFieldSite,UserPrefs.CamSN,UserPrefs.CamNickName]=PickCamFromDatabase();
-[UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CamSN);
+% [UserPrefs.SiteID,UserPrefs.CamSN,UserPrefs.CamID]=PickCamFromDatabase();
+% [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CamSN);
 
-IndividualCamDB=readCPG_CamDatabase("CamSN",UserPrefs.CamSN);
-
-% Find files in usable img folder 
+%% Find files in usable img folder 
 extensions = {'*.tif', '*.TIF', '*.jpg', '*.JPG'};
 files = [];
 for ext = extensions
@@ -220,7 +254,7 @@ hFig = gps_map_gui(UserPrefs, GPSpoints, readCPG_CamDatabase("CamSN",UserPrefs.C
 %}
 
 %% Pick Camera From Database
-function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase()
+function [SiteID,CamSN,CamID]=PickCamFromDatabase()
     CameraOptionsTable=readCPG_CamDatabase(format="searchtable");
     CameraOptionsTable.Date=[]; % remove date for display purposes
     CameraOptionsTable.Filename=[]; % remove date for display purposes
@@ -261,10 +295,10 @@ function [CamFieldSite,CamSN,CamNickName]=PickCamFromDatabase()
             error('Please select only 1 camera!');
         else
             rowIDX = find(lastCol, 1); % Find the first row where true appears
-            CamNickName=answers.Table{rowIDX, 3};
-            CamNickName=strtrim(CamNickName); %remove spaces
-            CamFieldSite=answers.Table{rowIDX, 1};
-            CamFieldSite=strtrim(CamFieldSite); %remove spaces
+            CamID=answers.Table{rowIDX, 3};
+            CamID=strtrim(CamID); %remove spaces
+            SiteID=answers.Table{rowIDX, 1};
+            SiteID=strtrim(SiteID); %remove spaces
             CamSN=answers.Table{rowIDX, 2}; % Extract the 2nd column value (CamSN)
         end
     else

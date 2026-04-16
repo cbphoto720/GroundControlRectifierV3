@@ -125,7 +125,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
     app.IMGlayoutGrid.RowSpacing = 0;
 
     % Create title for the img
-    app.IMG_desc_label = uilabel(app.IMGlayoutGrid, 'Text', sprintf("%s, %s, SN %d", UserPrefs.CamFieldSite, UserPrefs.CamNickName, UserPrefs.CamSN), ...
+    app.IMG_desc_label = uilabel(app.IMGlayoutGrid, 'Text', sprintf("%s, %s, SN %d", UserPrefs.SiteID, UserPrefs.CamID, UserPrefs.CamSN), ...
         'FontSize', 20, 'FontWeight', 'bold', 'HorizontalAlignment', 'right');
     app.IMG_desc_label.Layout.Row = 1;
     app.IMG_desc_label.Layout.Column = 1;
@@ -262,7 +262,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
         imgfile = imgfile(1); %DEBUG remove ; to get the filename in the command window
 
         %update title in the top corner:
-        app.IMG_desc_label.Text=sprintf("%s, %s, SN %d, \n IMG: %s", UserPrefs.CamFieldSite, UserPrefs.CamNickName, UserPrefs.CamSN, imgfile);
+        app.IMG_desc_label.Text=sprintf("%s, %s, SN %d, \n IMG: %s", UserPrefs.SiteID, UserPrefs.CamID, UserPrefs.CamSN, imgfile);
         
         if strcmp(imgfile, "")
             app.img = uint8(255 * ones(100,100,3)); % white 100x100 placeholder
@@ -483,7 +483,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
     end
 
     function saveCallback()
-        savefilename=fullfile(UserPrefs.OutputPath,strcat("GCR-",num2str(UserPrefs.SurveyDate),UserPrefs.CamFieldSite, UserPrefs.CamNickName, "_SN",num2str(UserPrefs.CamSN),".mat"));
+        savefilename=fullfile(UserPrefs.OutputPath,strcat("GCR-",num2str(UserPrefs.SurveyDate),UserPrefs.SiteID, UserPrefs.CamID, "_SN",num2str(UserPrefs.CamSN),".mat"));
         temp=savefilename;
         [savefilename,savelocation]=uiputfile('*.mat', 'Save As',savefilename); % pull up SaveAs dialog (write new name if user wants to change it)
         if savefilename == 0 % handle user cancel input

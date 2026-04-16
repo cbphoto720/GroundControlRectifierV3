@@ -9,15 +9,16 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
         DefAns = struct('SurveyDate', datestr(now, 'yyyymmdd'), ...
                         'SiteID', '', 'CamID', '', 'CamSN', '', ...
                         'CameraFilename', '', 'PullDateFromGPS', false, ...
-                        'CameraDB', '', 'GCPImages', '', 'GPSSurvey', '', ...
-                        'OutputPath', pwd, 'cbDefOps', false);
+                        'CameraDB', '', 'GCPimgPath', '', 'GPSSurveyFile', '', ...
+                        'OutputPath', pwd, 'cbDefOps', false,...
+                        'CalibFile', '', 'UsePrevCalib', false);
     else
         loaded = load(DefaultOptions);
         DefAns = loaded.DefAns;
     end
 
     % Create the main figure
-    fig = uifigure('Name', 'Survey Configuration', 'Position', [500 300 550 750]);
+    fig = uifigure('Name', 'Survey Configuration', 'Position', [500 300 750 750]);
     mainGrid = uigridlayout(fig, [5, 1]);
     mainGrid.RowHeight = {'fit', 'fit', 'fit', 'fit', 'fit'};
 
@@ -36,8 +37,8 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
 
     % --- SECTION 2: CAMERA INFORMATION PANEL ---
     camPanel = uipanel(mainGrid, 'Title', 'Camera Information', 'FontWeight', 'bold');
-    camGrid = uigridlayout(camPanel, [6, 2]);
-    camGrid.ColumnWidth = {'1x', '1x','1x'};
+    camGrid = uigridlayout(camPanel, [7, 4]);
+    camGrid.ColumnWidth = {'1x', '1x','1x',35};
 
     % Manual Entry Toggle
     cbNewCam = uicheckbox(camGrid, 'Text', 'Add New Camera (Manual Entry) OR Load DB to select existing', 'Value', true);
@@ -95,15 +96,34 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
     cbGPSDate.ValueChangedFcn = @(src, event) set(efDate, 'Enable', ~src.Value);
     if DefAns.PullDateFromGPS, efDate.Enable = 'off'; end
 
+    % Row 7: Calibration (With 3-dots button)
+    caliblabel=uilabel(camGrid, 'Text', 'CameraCalibration file:');
+    caliblabel.Layout.Row = 7;
+    caliblabel.Layout.Column = 1;
+    efCalibFile = uieditfield(camGrid, 'text', 'Value', DefAns.CalibFile);
+    efCalibFile.Layout.Row = 7; efCalibFile.Layout.Column = 2;
+
+    btnBrowseCalib = uibutton(camGrid, 'Text', '...', 'ButtonPushedFcn', @(btn, evt) browseFile(efCalibFile, '*.mat', 'Select Calibration File'));
+    btnBrowseCalib.Layout.Row = 7; btnBrowseCalib.Layout.Column = 4;
+    cbPrevCalib = uicheckbox(camGrid, 'Text', 'Use previous calibration', 'Value', DefAns.UsePrevCalib);
+    cbPrevCalib.Layout.Row = 7; cbPrevCalib.Layout.Column = 3;
+    cbPrevCalib.ValueChangedFcn = @(src, event) set([efCalibFile, btnBrowseCalib], 'Enable', ~src.Value);
+
+    % Initial state check
+    if DefAns.UsePrevCalib
+        efCalibFile.Enable = 'off';
+        btnBrowseCalib.Enable = 'off';
+    end
+
     % --- SECTION 3: SURVEY OPTIONS ---
     srvPanel = uipanel(mainGrid, 'Title', 'Survey Options', 'FontWeight', 'bold');
     srvGrid = uigridlayout(srvPanel, [2, 3]);
     srvGrid.ColumnWidth = {'1x', '2x', 35};
     uilabel(srvGrid, 'Text', 'GCP Images Folder:');
-    efGCP = uieditfield(srvGrid, 'text', 'Value', DefAns.GCPImages);
+    efGCP = uieditfield(srvGrid, 'text', 'Value', DefAns.GCPimgPath);
     uibutton(srvGrid, 'Text', '...', 'ButtonPushedFcn', @(btn, evt) browseFolder(efGCP));
     uilabel(srvGrid, 'Text', 'GPS Survey File:');
-    efGPSFile = uieditfield(srvGrid, 'text', 'Value', DefAns.GPSSurvey);
+    efGPSFile = uieditfield(srvGrid, 'text', 'Value', DefAns.GPSSurveyFile);
     uibutton(srvGrid, 'Text', '...', 'ButtonPushedFcn', @(btn, evt) browseFile(efGPSFile, '*.csv;*.txt', 'Select GPS File'));
 
     % --- SECTION 4: SAVE OPTIONS ---
@@ -187,6 +207,8 @@ function [answers, cancelled] = PrepOptionsGUI(DefaultOptions)
         answers.GPSSurveyFile = efGPSFile.Value;
         answers.OutputPath = efOut.Value;
         answers.cbDefOps = cbDefOps.Value;
+        answers.UsePrevCalib = cbPrevCalib.Value;
+        answers.CalibFile = efCalibFile.Value;
         
         cancelled = false;
         if cbDefOps.Value

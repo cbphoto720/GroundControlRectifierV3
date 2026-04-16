@@ -131,24 +131,47 @@ if UserPrefs.UsePrevCalib
         error('No matching date found in the database list.');
     end
     clear pattern list matchIdx\
+
+    PrevCamEntry=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,...
+        Date=datetime(UserPrefs.DateofICP(2:end-1), 'InputFormat', 'yyyyMMdd''T''HHmmss','TimeZone','UTC'));
+
+    cameracalib=PrevCamEntry.(UserPrefs.DateofICP);
+    UserPrefs.DateofICP=strcat('D',UserPrefs.SurveyDate,'T070000Z');
+
+    NewCamEntry=generate_CameraDBstruct(...
+        SiteID=UserPrefs.SiteID,...
+        CamID=UserPrefs.CamID,...
+        CamSN=UserPrefs.CamSN,...
+        Filename=UserPrefs.CameraFilename, ...
+        Date=UserPrefs.DateofICP); % Create a workspace var based on User inputs
+
+    NewCamEntry.(UserPrefs.DateofICP)=cameracalib; % copy over previous
+    NewCamEntry.(UserPrefs.DateofICP).GroundControl={}; % remove any previous GCPs
+
+
 else
     % Upload a file to include the camera GCPs
     %UserPrefs.Calib= PATH TO .mat file
     % Use struct2cell to peel the name away immediately
-    data = struct2cell(load(UserPrefs.CalibFile));
-    cameracalib = data{1};
-    clear data
+    loadCamParamdata = struct2cell(load(UserPrefs.CalibFile));
+    cameracalib = loadCamParamdata{1};
 
-    UserPrefs.DateofICP=strcat('D',UserPrefs.SurveyDate,'T070000Z');
+    UserPrefs.DateofICP=strcat('D',UserPrefs.SurveyDate,'T070000Z'); 
+    %WIP UserPrefs.DateofICP is the only UserPrefs defined outside of
+    %PrepOptionsGUI.  I also dislike that presents itself as a Date, but is
+    %in fact a struct name.  
+
+    NewCamEntry=generate_CameraDBstruct(...
+        SiteID=UserPrefs.SiteID,...
+        CamID=UserPrefs.CamID,...
+        CamSN=UserPrefs.CamSN,...
+        Filename=UserPrefs.CameraFilename, ...
+        Date=UserPrefs.DateofICP,...
+        CameraParams=cameracalib); % Create a workspace var based on User inputs
+
+    clear loadCamParamdata
 end
-
-NewCamEntry=generate_CameraDBstruct(...
-    SiteID=UserPrefs.SiteID,...
-    CamID=UserPrefs.CamID,...
-    CamSN=UserPrefs.CamSN,...
-    Filename=UserPrefs.CameraFilename, ...
-    Date=UserPrefs.SurveyDate,...
-    CameraParams=cameracalib); % Create a workspace var based on User inputs
+clear cameracalib
 
 % Have user select Camera and Intrinsics they want to use for this rectification
 % [UserPrefs.SiteID,UserPrefs.CamSN,UserPrefs.CamID]=PickCamFromDatabase();
@@ -221,25 +244,8 @@ disp(DifTimes);
 clear i dif INDvalues filemask linkedIDX localIDX mask maskedIndicies minIND numpoints SetMask timediff maskedIndices
 %% Get UV coordinates from relevant GPS data
 
-hFig = gps_map_gui(UserPrefs, GPSpoints, readCPG_CamDatabase("CamSN",UserPrefs.CamSN));  % Get figure handle
+hFig = gps_map_gui(UserPrefs, GPSpoints, NewCamEntry);  % Get figure handle
 % uiwait(hFig);  % Wait until the GUI resumes or is closedy
-
-%% Generate Cam pose based on the GPS points
-% disp("GUI closed. Resuming main script...");
-% 
-% % do more actions (like load in the saved data)
-% outputmask=find(GPSpoints.ImageU~=0); % find indexes that have an associated Image pixel coordinate (GPS points visible to the camera)
-% [pose, xyzGCP] = EstimateCameraPose(FullCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:)); %WIP TEMP get initial pose estimate & GCPs in local coordinates camera=[0,0,0]
-% 
-% % [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CameraDB,UserPrefs.CamSN);
-% 
-% % Generate ICP (Internal Camera Parameters [Intrinsics]) based on a previous survey
-% readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=string(UserPrefs.DateofICP(2:end)),format="compact");
-% icp=readDB.icp;
-% icp = makeRadialDistortion(icp);
-% icp = makeTangentialDistortion(icp);
-% 
-% betaOUT = constructCameraPose(xyzGCP, [GPSpoints.ImageU(outputmask,:), GPSpoints.ImageV(outputmask,:)], icp, [0,0,0,pose]);
 
 %%
 %{ 

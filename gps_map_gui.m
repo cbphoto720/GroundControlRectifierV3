@@ -501,7 +501,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
         [pose, xyzGCP] = EstimateCameraPose(IndividualCamDB.(UserPrefs.DateofICP),GPSpoints(outputmask,:));
 
         % Generate ICP (Internal Camera Parameters [Intrinsics])
-        readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=string(UserPrefs.DateofICP(2:end)),format="compact");
+        readDB=readCPG_CamDatabase(CamSN=UserPrefs.CamSN,Date=UserPrefs.DateofICP,format="compact");
         icp=readDB.icp;
         icp = makeRadialDistortion(icp);
         icp = makeTangentialDistortion(icp);

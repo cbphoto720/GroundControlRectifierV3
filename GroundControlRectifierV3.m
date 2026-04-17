@@ -173,6 +173,10 @@ else
 end
 clear cameracalib
 
+%WIP Generate a new CPG_CamDatabase now with blank GCP file as an
+%intermediate step.  Plug this into gps_map_gui.m
+cpgDB=updateCPG_CamDatabase(NewCamEntry);
+
 % Have user select Camera and Intrinsics they want to use for this rectification
 % [UserPrefs.SiteID,UserPrefs.CamSN,UserPrefs.CamID]=PickCamFromDatabase();
 % [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CamSN);

@@ -175,11 +175,7 @@ clear cameracalib
 
 %WIP Generate a new CPG_CamDatabase now with blank GCP file as an
 %intermediate step.  Plug this into gps_map_gui.m
-cpgDB=updateCPG_CamDatabase(NewCamEntry);
-
-% Have user select Camera and Intrinsics they want to use for this rectification
-% [UserPrefs.SiteID,UserPrefs.CamSN,UserPrefs.CamID]=PickCamFromDatabase();
-% [UserPrefs.DateofICP,~]=PickCamIntrinsicsDate(UserPrefs.CamSN);
+% cpgDB=updateCPG_CamDatabase(NewCamEntry);
 
 %% Find files in usable img folder 
 extensions = {'*.tif', '*.TIF', '*.jpg', '*.JPG'};
@@ -262,106 +258,6 @@ hFig = gps_map_gui(UserPrefs, GPSpoints, NewCamEntry);  % Get figure handle
                                     
 ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝^⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ⸝ᐟᐠ⸜ˎ_ˏ
 %}
-
-%% Pick Camera From Database
-function [SiteID,CamSN,CamID]=PickCamFromDatabase()
-    CameraOptionsTable=readCPG_CamDatabase(format="searchtable");
-    CameraOptionsTable.Date=[]; % remove date for display purposes
-    CameraOptionsTable.Filename=[]; % remove date for display purposes
-    CameraOptionsTable.SiteID=char(CameraOptionsTable.SiteID); % convert to char
-    CameraOptionsTable.CamID=char(CameraOptionsTable.CamID); % convert to char
-    CameraOptionsTable.Checkbox=false(height(CameraOptionsTable),1); % add checkbox for user selection
-
-    Title = 'Pick camera profile from database';
-    Options.Resize = 'on';
-    Options.Interpreter = 'tex';
-    Options.CancelButton = 'on';
-    Options.ApplyButton = 'off';
-    Options.ButtonNames = {'Continue','Cancel'};
-    
-    Prompt = {};
-    Formats = {};
-
-    Prompt(1,:) = {'Select only 1 camera station from the checkbox!', [], []};
-    Formats(1,1).type = 'text';
-    Formats(1,1).size = [-1 0];
-
-    Prompt(end+1,:) = {'Item Table','Table',[]};
-    Formats(2,1).type = 'table';
-    Formats(2,1).items = {'SiteID', 'CamSN', 'CamID', 'Checkbox'};
-    Formats(2,1).format = {'char', 'char', 'char', 'logical'};
-    Formats(2,1).size = [-1 -1];
-    DefAns.Table = table2cell(CameraOptionsTable);
-
-
-
-    [answers, cancelled] = inputsdlg(Prompt, Title, Formats, DefAns, Options);
-
-    if ~cancelled
-        lastCol = cell2mat(answers.Table(:, end)); % Convert last column to logical/array
-        numTrue = sum(lastCol); % Count the number of true values
-        
-        if numTrue ~= 1
-            error('Please select only 1 camera!');
-        else
-            rowIDX = find(lastCol, 1); % Find the first row where true appears
-            CamID=answers.Table{rowIDX, 3};
-            CamID=strtrim(CamID); %remove spaces
-            SiteID=answers.Table{rowIDX, 1};
-            SiteID=strtrim(SiteID); %remove spaces
-            CamSN=answers.Table{rowIDX, 2}; % Extract the 2nd column value (CamSN)
-        end
-    else
-        error('User selected cancel!');
-    end
-end
-
-function [searchKeyoption,rowIDX]=PickCamIntrinsicsDate(CamSerialNumber)
-    CamDBread=readCPG_CamDatabase(CamSN=CamSerialNumber,Format="searchtable");
-    dateArray = CamDBread.Date{:};
-    DateOptionsTable = table(dateArray', 'VariableNames', {'Date'});
-    DateOptionsTable.Date = strcat('D',datestr(DateOptionsTable.Date, 'yyyymmddThhMMssZ'));  % or use any format you like
-    DateOptionsTable.Checkbox=false(height(DateOptionsTable),1); % add checkbox for user selection
-
-    Title = 'Pick Intrinsics from a GCP date';
-    Options.Resize = 'on';
-    Options.Interpreter = 'tex';
-    Options.CancelButton = 'on';
-    Options.ApplyButton = 'off';
-    Options.ButtonNames = {'Continue','Cancel'};
-    
-    Prompt = {};
-    Formats = {};
-
-    Prompt(1,:) = {'Select only 1 date from the checkbox!', [], []};
-    Formats(1,1).type = 'text';
-    Formats(1,1).size = [-1 0];
-
-    Prompt(end+1,:) = {'Item Table','Table',[]};
-    Formats(2,1).type = 'table';
-    Formats(2,1).items = {'Date','Checkbox'};
-    Formats(2,1).format = {'char', 'logical'};
-    Formats(2,1).size = [-1 -1];
-    DefAns.Table = table2cell(DateOptionsTable);
-
-
-
-    [answers, cancelled] = inputsdlg(Prompt, Title, Formats, DefAns, Options);
-
-    if ~cancelled
-        lastCol = cell2mat(answers.Table(:, end)); % Convert last column to logical/array
-        numTrue = sum(lastCol); % Count the number of true values
-        
-        if numTrue ~= 1
-            error('Please select only 1 camera!');
-        else
-            rowIDX = find(lastCol, 1); % Find the first row where true appears
-            searchKeyoption=answers.Table{rowIDX, 1}; % Extract the 2nd column value (CamSN)
-        end
-    else
-        error('User selected cancel!');
-    end
-end
 
 function dt = extractDatetimeFromFilename(filename)
     % Extract datetime from filename string

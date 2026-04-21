@@ -67,7 +67,7 @@ switch selection
         close(findall(groot,'Type','figure'))
         close all; clear all; clc
         addpath(genpath(fileparts(mfilename('fullpath'))))
-        disp(fileparts(mfilename('fullpath')));
+        % disp(fileparts(mfilename('fullpath')));
     case 'Cancel'
         close(fig);
         error('User selected cancel.  Please save you variables before getting started.')

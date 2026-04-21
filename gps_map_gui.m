@@ -76,11 +76,12 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
     [path_to_CPG_CamDatabase_folder, ~, ~] = fileparts(UserPrefs.CameraDB);
     addpath(genpath(path_to_CPG_CamDatabase_folder));
 
-    FullDB=readCPG_CamDatabase();
+    % FullDB=readCPG_CamDatabase();
 
     % Get unique descriptions (setnames)
     setnames = getSetNames(GPSpoints);
     NUM_IMGsets = numel(setnames); % Get number of unique sets
+    app.saveBoolean=false();
 
        % Initialize the current index tracker for setnames
     setIDX = 1;
@@ -170,10 +171,10 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
     app.GPSButtonGrid.RowHeight = {'1x', '1x'};
 
     % Create Export Button
-    app.ExportButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Export points');
-    app.ExportButton.ButtonPushedFcn = @(~,~) ExportCallback();
-    app.ExportButton.Layout.Row = 2;
-    app.ExportButton.Layout.Column = 1;
+    % app.ExportButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Export points');
+    % app.ExportButton.ButtonPushedFcn = @(~,~) ExportCallback();
+    % app.ExportButton.Layout.Row = 2;
+    % app.ExportButton.Layout.Column = 1;
 
     % Create Save Button
     app.SaveButton = uibutton(app.GPSButtonGrid, 'push', 'Text', 'Save Progress');
@@ -475,6 +476,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
         outtable=[GPSpoints.Northings(outputmask),GPSpoints.Eastings(outputmask),GPSpoints.H(outputmask),...
             GPSpoints.ImageU(outputmask),GPSpoints.ImageV(outputmask)];
 
+        warning('This button is OLD please ignore')
         % Print data to console
         for i=1:length(outtable)
             fprintf('- [%.6f, %.6f, %.6f, %d, %d]\n',outtable(i,1),outtable(i,2),outtable(i,3),outtable(i,4),outtable(i,5));
@@ -491,7 +493,10 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
             return % do not proceed with saving, because user cancelled
         else
             save(fullfile(savelocation,savefilename),"GPSpoints","UserPrefs") %WIP - Save file should be to outputfolder path in user prefs.
-            fprintf("saved progress to output folder: %s\n",fullfile(savelocation,savefilename));
+            % FullDB=updateCPG_CamDatabase(IndividualCamDB, "mode","update"); %SAVE the new camera entry
+            fprintf("saved session progress to output folder: %s\n",fullfile(savelocation,savefilename));
+            app.saveBoolean=true();
+            CalculateCallback();
         end
     end
 
@@ -512,7 +517,9 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
         for i=1:length(outputmask)
             [GPSpoints.Reprojectu1(outputmask(i)), GPSpoints.Reprojectv1(outputmask(i))] = getUVfromXYZ(xyzGCP(i,1), xyzGCP(i,2), xyzGCP(i,3), icp, betaOUT);
         end
-
+        if ~app.saveBoolean
+            warning('Did NOT update the database.  Click "Save Progress" to save the session & update the database')
+        end
         % Print Beta parameters to add to the database
         fprintf("Beta parameters:\n");
         fprintf("%16.6f",betaOUT);
@@ -521,7 +528,7 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
         Origin = IndividualCamDB.(UserPrefs.DateofICP).CamPose;
         
         fprintf([ ...
-            '      CamPose:\n' ...
+            'CamPose:\n' ...
             '        Northings: ''%.5f''\n' ...
             '        Eastings: ''%.5f''\n' ...
             '        Height: ''%.3f''\n' ...
@@ -536,10 +543,28 @@ function GCPapp = gps_map_gui(UserPrefs, GPSpoints, IndividualCamDB)
             betaOUT(4), betaOUT(5), betaOUT(6)...
             );
 
-        % Create new CamDB
-        
-
-        FullDB=readCPG_CamDatabase();
+        if app.saveBoolean
+            app.saveBoolean=false();
+            % Update CamPose based on calculations
+            ComputedCamDB=IndividualCamDB; % load in our baseline
+            ComputedCamDB.(UserPrefs.DateofICP).CamPose.Northings=str2double(ComputedCamDB.(UserPrefs.DateofICP).CamPose.Northings) -   betaOUT(1);
+            ComputedCamDB.(UserPrefs.DateofICP).CamPose.Eastings=str2double(ComputedCamDB.(UserPrefs.DateofICP).CamPose.Eastings) -     betaOUT(2);
+            ComputedCamDB.(UserPrefs.DateofICP).CamPose.Height=str2double(ComputedCamDB.(UserPrefs.DateofICP).CamPose.Height) -         betaOUT(3);
+            ComputedCamDB.(UserPrefs.DateofICP).CamPose.Pitch=      betaOUT(4);
+            ComputedCamDB.(UserPrefs.DateofICP).CamPose.Roll=       betaOUT(5);
+            ComputedCamDB.(UserPrefs.DateofICP).CamPose.Azimuth=    betaOUT(6);
+    
+            % Generate GCP table
+            outtable=[GPSpoints.Northings(outputmask),GPSpoints.Eastings(outputmask),GPSpoints.H(outputmask),...
+                GPSpoints.ImageU(outputmask),GPSpoints.ImageV(outputmask)];
+    
+            for i=1:length(outtable)
+                ComputedCamDB.(UserPrefs.DateofICP).GroundControl{i,1}=num2cell(outtable(i,:))';
+            end
+    
+            % Create new CamDB
+            FullDB=updateCPG_CamDatabase(ComputedCamDB, "mode","update"); %SAVE the new camera entry
+        end
 
         % Compress the display Rectification
         Rectification_compressed = CalcRectification(icp, betaOUT, xyzGCP, 2, [2,1]);
